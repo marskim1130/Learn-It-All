@@ -5,3 +5,45 @@
 2026-07-11 11:51 +08:00 --- 缺少承载完整工程链路学习目标的项目目录与明确需求边界 --- 通过深度拷问 [Grill Me] 收敛技术选型、功能范围、关键路径、测试接缝和四周里程碑，并整理为产品需求文档 [PRD] 与架构决策记录 [ADR] --- 修改 `README.md`、`docs/PRD.md`、`docs/decisions/0001-foundation.md`、`docs/learning/README.md`、`work.md`。撤回方式 [Rollback Strategy]：业务实现前删除整个 `ai-chat-dashboard` 目录；如需保留目录，则删除本条所列文件。
 
 2026-07-11 12:08 +08:00 --- PRD 尚未拆解为可独立领取和验证的实施任务 --- 按依赖顺序发布 15 个端到端垂直切片 [Vertical Slices]，统一验收标准与完成约束 --- 修改 `docs/issues/README.md`、`docs/issues/001.md` 至 `docs/issues/015.md`、`work.md`。撤回方式 [Rollback Strategy]：删除 `docs/issues/`，并删除本条审计记录。
+
+2026-07-11 12:16 +08:00 --- Issue 001 缺少可执行的首个公共行为规格 --- 进入测试驱动开发 [TDD] 红阶段 [RED]，添加 `GET /health/live` 应返回进程存活状态的单个失败测试及最小测试运行入口，未实现 API --- 修改 `package.json`、`pnpm-workspace.yaml`、`apps/api/package.json`、`apps/api/test/health.test.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除本条新增的四个工程文件，并删除本条审计记录。
+
+2026-07-11 14:25 +08:00 --- `GET /health/live` 测试因缺少公开应用模块而失败 --- 进入绿阶段 [GREEN]，添加 Fastify 运行依赖并实现仅包含存活接口的 `buildApp()` 最小公开 API --- 修改 `apps/api/package.json`、`apps/api/src/app.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除 `apps/api/src/app.ts`，从 `apps/api/package.json` 移除 Fastify 依赖，并删除本条审计记录。
+
+2026-07-11 14:26 +08:00 --- 最小实现需要安装并锁定实际依赖版本，且需验证首个追踪子弹 --- 在项目根目录执行 `pnpm install` 生成锁文件，并运行单个健康接口测试；结果为 1 个测试通过。重构阶段 [REFACTOR] 未发现重复或代码异味，因此保持实现不变 --- 修改 `pnpm-lock.yaml`、`work.md`。撤回方式 [Rollback Strategy]：删除 `pnpm-lock.yaml` 与本条审计记录；如需恢复依赖目录，可重新执行 `pnpm install`。
+
+2026-07-11 14:31 +08:00 --- Issue 001 尚未定义数据库不可用时的服务就绪语义 --- 进入第二轮红阶段 [RED]，通过公开 `buildApp` 依赖接口添加单个测试，规定 `GET /health/ready` 在数据库连接检查失败时返回 503 与结构化依赖状态；未修改实现且未运行测试 --- 修改 `apps/api/test/health.test.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除 `GET /health/ready` 测试块与本条审计记录。
+
+2026-07-11 14:48 +08:00 --- `GET /health/ready` 因路由不存在返回 404，红灯符合预期 --- 进入绿阶段 [GREEN]，为 `buildApp` 添加最小数据库连接检查依赖，并在检查失败时返回 503 与结构化依赖状态；未实现尚无测试约束的就绪成功响应 --- 修改 `apps/api/src/app.ts`、`work.md`。撤回方式 [Rollback Strategy]：移除 `AppDependencies`、`buildApp` 参数和 `/health/ready` 路由，并删除本条审计记录。
+
+2026-07-11 14:49 +08:00 --- 数据库未就绪最小实现需要确认没有破坏存活检查 --- 运行健康接口测试文件，2 个测试全部通过；重构阶段 [REFACTOR] 未发现重复或需要提取的复杂性，因此保持实现不变 --- 修改 `work.md`。撤回方式 [Rollback Strategy]：删除本条验证记录。
+
+2026-07-11 14:53 +08:00 --- Issue 001 尚未定义数据库连接正常时的服务就绪响应 --- 进入第三轮红阶段 [RED]，添加单个测试，规定 `GET /health/ready` 在数据库可用时返回 200 与结构化可用状态；未修改实现且未运行测试 --- 修改 `apps/api/test/health.test.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除“数据库可用时返回服务已就绪”测试与本条审计记录。
+
+2026-07-11 15:15 +08:00 --- 数据库可用测试因就绪路由缺少成功响应体而失败，且 API 缺少可执行启动入口 --- 返回最小结构化成功状态，添加 API 监听入口、包脚本与严格 TypeScript 基础配置 --- 修改 `apps/api/src/app.ts`、`apps/api/src/server.ts`、`apps/api/package.json`、`apps/api/tsconfig.json`、`tsconfig.base.json`、`work.md`。撤回方式 [Rollback Strategy]：移除成功响应分支并删除新增启动与 TypeScript 配置文件，恢复 API 包清单后删除本条记录。
+
+2026-07-11 15:22 +08:00 --- Issue 001 缺少真实 PostgreSQL 网关、统一质量脚本、Docker 编排与 CI 配置 --- 通过数据库、平台子代理建立 Drizzle 数据库包和共享工程配置，主代理集成根脚本、API 组合根与配置导出 --- 修改 `packages/database/**`、`packages/config/**`、`infra/**`、`.github/workflows/ci.yml`、`.env.example`、`docker-compose.yml`、`package.json`、`apps/api/package.json`、`apps/api/src/server.ts`、`eslint.config.mjs`、`prettier.config.mjs`、`README.md`、`work.md`。撤回方式 [Rollback Strategy]：删除新增平台与数据库目录和配置文件，并恢复根清单、API 清单、API 启动入口与 README 后删除本条记录。
+
+2026-07-11 15:27 +08:00 --- Issue 001 缺少可展示健康状态的 Next.js 页面，首次统一类型检查发现数据库迁移调用类型错误与依赖声明类型噪声 --- 集成 Web 子代理产出，修正 Drizzle 迁移使用数据库实例、继承统一 TypeScript 配置并补充 Web 类型检查与 API 服务端地址 --- 修改 `apps/web/**`、`packages/database/tsconfig.json`、`packages/database/src/migrate.ts`、`.env.example`、`work.md`。撤回方式 [Rollback Strategy]：删除 `apps/web/`，恢复数据库配置与迁移文件和环境模板，并删除本条记录。
+
+2026-07-11 15:29 +08:00 --- Web 类型检查因缺少现代编译目标和 DOM 可迭代类型而失败 --- 让 Web 配置继承统一严格配置，并增加 `dom.iterable`、增量编译和 Next.js Bundler 模块解析选项 --- 修改 `apps/web/tsconfig.json`、`work.md`。撤回方式 [Rollback Strategy]：恢复原 Web TypeScript 配置并删除本条记录。
+
+2026-07-11 15:31 +08:00 --- Next.js 构建无法解析前端源码中的 `.js` 扩展导入，并因用户目录存在额外锁文件误判工作区根 --- 改用 Bundler 原生无扩展导入并显式固定 Turbopack 工作区根目录 --- 修改 `apps/web/app/page.tsx`、`apps/web/next.config.ts`、`work.md`。撤回方式 [Rollback Strategy]：恢复原导入并删除 Next.js 配置和本条记录。
+
+2026-07-11 15:33 +08:00 --- 首次 ESLint 检查错误地类型分析配置文件，API 测试未进入项目服务，Web 测试存在无必要异步函数和不安全字符串转换 --- 限定 ESLint 类型感知范围、纳入 API 测试配置并最小修正 Web 测试替身 --- 修改 `packages/config/eslint.config.mjs`、`apps/api/tsconfig.json`、`apps/web/test/health.test.ts`、`work.md`。撤回方式 [Rollback Strategy]：恢复上述三个配置和测试文件并删除本条记录。
+
+2026-07-11 15:35 +08:00 --- Web 测试替身同步返回 `Response`，不满足真实 `fetch` 的 Promise 契约 --- 使用 `Promise.resolve` 保持测试替身与公开 Fetch 接口一致 --- 修改 `apps/web/test/health.test.ts`、`work.md`。撤回方式 [Rollback Strategy]：恢复同步测试替身并删除本条记录。
+
+2026-07-11 15:37 +08:00 --- ESLint 拒绝将 `Request` 通过默认对象字符串化转换为 URL --- 按 `Request`、`URL` 和字符串分支显式提取请求地址 --- 修改 `apps/web/test/health.test.ts`、`work.md`。撤回方式 [Rollback Strategy]：恢复字符串转换并删除本条记录。
+
+2026-07-11 15:40 +08:00 --- 统一格式化会遍历 `.next` 与 `dist` 构建产物，产生无意义耗时和输出 --- 添加 Prettier 忽略规则，并执行统一格式化；格式化同时规范了本阶段新增源码、配置和 Issue 索引排版 --- 修改 `.prettierignore`、本阶段新增源码与配置文件、`docs/issues/README.md`、`work.md`。撤回方式 [Rollback Strategy]：删除 `.prettierignore`，使用版本控制恢复本次纯格式变化，并删除本条记录。
+
+2026-07-11 15:43 +08:00 --- 独立测试审查发现 `.next`、TypeScript 增量文件未被 Git 忽略，且 SQL 迁移没有 Prettier 解析器 --- 添加项目级 Git 忽略规则并从格式检查排除 Drizzle SQL 迁移 --- 修改 `.gitignore`、`.prettierignore`、`work.md`。撤回方式 [Rollback Strategy]：删除 `.gitignore`，恢复 `.prettierignore` 并删除本条记录。
+
+2026-07-11 15:47 +08:00 --- 规格审查发现 API 生产构建混入测试、CI 未验证真实 PostgreSQL、启动文档与学习记录不完整 --- 分离 API 生产与测试 TypeScript 配置，CI 启动 PostgreSQL 并执行迁移，修正 Next.js 根路径，补齐本地运行手册和 Issue 001 学习记录 --- 修改 `apps/api/tsconfig.json`、`apps/api/tsconfig.test.json`、`apps/api/package.json`、`.github/workflows/ci.yml`、`apps/web/next.config.ts`、`README.md`、`docs/learning/README.md`、`docs/learning/issue-001-foundation.md`、`work.md`。撤回方式 [Rollback Strategy]：恢复 API 配置、CI、Next.js 配置和 README，删除新增学习记录并删除本条记录。
+
+2026-07-11 15:49 +08:00 --- API 默认端口与环境模板及运行文档不一致 --- 将 Fastify 默认监听端口统一为 `3001` --- 修改 `apps/api/src/server.ts`、`work.md`。撤回方式 [Rollback Strategy]：将默认端口恢复为 `4000` 并删除本条记录。
+
+2026-07-11 15:51 +08:00 --- 分离 API 生产构建后，ESLint 项目服务无法为测试文件定位 TypeScript 项目 --- 在测试目录添加专用 TypeScript 配置，复用测试类型检查契约且不污染生产构建 --- 修改 `apps/api/test/tsconfig.json`、`work.md`。撤回方式 [Rollback Strategy]：删除测试目录 TypeScript 配置与本条记录。
+
+2026-07-11 15:53 +08:00 --- Issue 001 需要通过独立质量门禁并确认构建产物不会进入版本控制 --- 运行格式、Lint、测试、类型检查和构建，全部通过；6 个测试通过，1 个真实 PostgreSQL 测试因本机无 Docker 跳过，CI 已配置为强制运行；确认 API 生产入口存在且 `.next`、`dist`、增量文件均被忽略，随后完成 Issue 001 验收勾选 --- 修改 `docs/issues/001.md`、`work.md`。撤回方式 [Rollback Strategy]：恢复 Issue 001 验收勾选并删除本条验证记录。

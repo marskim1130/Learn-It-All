@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: ai_chat_dashboard_test
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ai_chat_dashboard_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ai_chat_dashboard_test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ai-chat-dashboard/pnpm-lock.yaml
+      - name: Install dependencies
+        working-directory: ai-chat-dashboard
+        run: pnpm install --frozen-lockfile
+      - name: Check formatting
+        working-directory: ai-chat-dashboard
+        run: pnpm format:check
+      - name: Lint
+        working-directory: ai-chat-dashboard
+        run: pnpm lint
+      - name: Type check
+        working-directory: ai-chat-dashboard
+        run: pnpm typecheck
+      - name: Run database migrations
+        working-directory: ai-chat-dashboard
+        run: pnpm db:migrate
+      - name: Test
+        working-directory: ai-chat-dashboard
+        run: pnpm test
+      - name: Build
+        working-directory: ai-chat-dashboard
+        run: pnpm build

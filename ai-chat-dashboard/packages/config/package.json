@@ -1,0 +1,17 @@
+{
+  "name": "@ai-chat-dashboard/config",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./eslint": "./eslint.config.mjs",
+    "./prettier": "./prettier.config.mjs",
+    "./typescript/base": "./typescript/base.json",
+    "./typescript/node": "./typescript/node.json",
+    "./typescript/next": "./typescript/next.json"
+  },
+  "peerDependencies": {
+    "eslint": ">=9",
+    "prettier": ">=3",
+    "typescript": ">=5.8"
+  }
+}
