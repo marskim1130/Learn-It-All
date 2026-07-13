@@ -2,7 +2,10 @@
 
 一个用于补齐 TypeScript、React、Next.js、Node.js、PostgreSQL、Redis 与持续集成 [Continuous Integration, CI] 能力的教学型全栈项目。
 
-Issue 001 工程骨架已建立：Next.js Web、Fastify API、PostgreSQL 数据库包、Docker Compose 和基础持续集成 [Continuous Integration, CI]。
+当前进度：
+
+- Issue 001：工程骨架已建立（Next.js Web、Fastify API、PostgreSQL、Docker Compose、CI）。
+- Issue 002：用户注册 API 已完成（Argon2 密码摘要、邮箱唯一约束、稳定错误码）。
 
 ## 环境要求
 
@@ -24,6 +27,17 @@ pnpm dev
 - API：`http://localhost:3001`
 - 存活检查：`http://localhost:3001/health/live`
 - 就绪检查：`http://localhost:3001/health/ready`
+- 用户注册：`POST http://localhost:3001/auth/register`
+
+### 注册示例
+
+```powershell
+Invoke-RestMethod -Method Post -Uri http://localhost:3001/auth/register `
+  -ContentType "application/json" `
+  -Body '{"email":"alice@example.com","password":"password123"}'
+```
+
+成功返回 `201` 与公开用户信息；重复邮箱返回 `409 EMAIL_ALREADY_EXISTS`；无效输入返回 `400 VALIDATION_ERROR`。
 
 若未安装 Docker，可以运行不依赖真实 PostgreSQL 的测试，但数据库集成测试会被跳过。
 
@@ -46,4 +60,4 @@ pnpm build
 
 ## 下一步
 
-按照 `docs/issues/README.md` 从 Issue 002 用户注册继续实现。
+按照 `docs/issues/README.md` 从 Issue 003 登录与身份会话继续实现。

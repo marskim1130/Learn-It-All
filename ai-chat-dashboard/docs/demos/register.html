@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>用户注册 Demo</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: "Segoe UI", system-ui, sans-serif;
+      }
+      body {
+        margin: 0 auto;
+        max-width: 48rem;
+        padding: 1.5rem;
+        line-height: 1.6;
+      }
+      code,
+      pre {
+        font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      }
+      pre {
+        overflow: auto;
+        padding: 0.75rem 1rem;
+        border: 1px solid color-mix(in oklab, CanvasText 20%, Canvas);
+        border-radius: 0.5rem;
+      }
+      label {
+        display: block;
+        margin-top: 0.75rem;
+      }
+      input,
+      button {
+        font: inherit;
+        margin-top: 0.25rem;
+      }
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 0.5rem 0.75rem;
+      }
+      button {
+        margin-top: 1rem;
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+      }
+      #result {
+        margin-top: 1rem;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>用户注册 Demo</h1>
+    <p>演示 <code>POST /auth/register</code>：校验输入、Argon2 密码摘要、邮箱唯一冲突。</p>
+
+    <h2>API</h2>
+    <pre>
+POST /auth/register
+Content-Type: application/json
+
+{
+  "email": "alice@example.com",
+  "password": "password123"
+}</pre>
+
+    <h2>设计思想</h2>
+    <ul>
+      <li>公开接口只返回用户公开字段，不返回密码或摘要。</li>
+      <li>
+        错误使用稳定机器码：<code>VALIDATION_ERROR</code>、<code>EMAIL_ALREADY_EXISTS</code>。
+      </li>
+      <li>数据库唯一约束兜底并发注册竞态。</li>
+    </ul>
+
+    <h2>可运行 Demo</h2>
+    <p>先启动 API（默认 <code>http://localhost:3001</code>），再在本页提交。</p>
+    <form id="register-form">
+      <label>
+        API 地址
+        <input id="api-base" value="http://localhost:3001" />
+      </label>
+      <label>
+        邮箱
+        <input id="email" type="email" value="alice@example.com" required />
+      </label>
+      <label>
+        密码（至少 8 位）
+        <input id="password" type="password" value="password123" required minlength="8" />
+      </label>
+      <button type="submit">注册</button>
+    </form>
+    <pre id="result">等待提交…</pre>
+
+    <h2>常见错误</h2>
+    <ul>
+      <li>API 未启动：浏览器显示网络错误。</li>
+      <li>重复邮箱：状态码 409，错误码 <code>EMAIL_ALREADY_EXISTS</code>。</li>
+      <li>非法邮箱或过短密码：状态码 400，错误码 <code>VALIDATION_ERROR</code>。</li>
+    </ul>
+
+    <script>
+      const form = document.getElementById("register-form");
+      const result = document.getElementById("result");
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const apiBase = document.getElementById("api-base").value.replace(/\/$/, "");
+        const email = document.getElementById("email").value;
+        const password = document.getElementById("password").value;
+
+        result.textContent = "请求中…";
+        try {
+          const response = await fetch(`${apiBase}/auth/register`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password }),
+          });
+          const body = await response.json();
+          result.textContent = `HTTP ${response.status}\n${JSON.stringify(body, null, 2)}`;
+        } catch (error) {
+          result.textContent = `请求失败：${error instanceof Error ? error.message : String(error)}`;
+        }
+      });
+    </script>
+  </body>
+</html>

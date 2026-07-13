@@ -3,6 +3,7 @@
 学习记录只覆盖项目中实际验证过的概念，并遵循“为什么 [Why] → 是什么 [What] → 怎么做 [How] → 完整示例 [Complete Example]”。
 
 - [Issue 001：工程骨架](issue-001-foundation.md)
+- [Issue 002：用户注册](issue-002-register.md)
 
 - TypeScript：泛型 [Generics]、类型推导 [Type Inference]、工具类型 [Utility Types]。
 - React：状态所有权 [State Ownership]、并发渲染 [Concurrent Rendering]、性能测量和虚拟化 [Virtualization]。

@@ -47,3 +47,25 @@
 2026-07-11 15:51 +08:00 --- 分离 API 生产构建后，ESLint 项目服务无法为测试文件定位 TypeScript 项目 --- 在测试目录添加专用 TypeScript 配置，复用测试类型检查契约且不污染生产构建 --- 修改 `apps/api/test/tsconfig.json`、`work.md`。撤回方式 [Rollback Strategy]：删除测试目录 TypeScript 配置与本条记录。
 
 2026-07-11 15:53 +08:00 --- Issue 001 需要通过独立质量门禁并确认构建产物不会进入版本控制 --- 运行格式、Lint、测试、类型检查和构建，全部通过；6 个测试通过，1 个真实 PostgreSQL 测试因本机无 Docker 跳过，CI 已配置为强制运行；确认 API 生产入口存在且 `.next`、`dist`、增量文件均被忽略，随后完成 Issue 001 验收勾选 --- 修改 `docs/issues/001.md`、`work.md`。撤回方式 [Rollback Strategy]：恢复 Issue 001 验收勾选并删除本条验证记录。
+
+## 2026-07-13
+
+2026-07-13 17:17 +08:00 --- Issue 002 缺少可执行的首个公共行为规格 --- 进入测试驱动开发 [TDD] 红阶段 [RED]，添加 `POST /auth/register` 有效输入应创建用户并返回公开用户信息的单个失败测试，未实现 API --- 修改 `apps/api/test/auth-register.test.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除 `apps/api/test/auth-register.test.ts` 与本条审计记录。
+
+2026-07-13 17:18 +08:00 --- `POST /auth/register` 因路由不存在返回 404，红灯符合预期 --- 进入绿阶段 [GREEN]，添加仅返回公开用户信息的最小注册路由，尚未引入校验、哈希与持久化 --- 修改 `apps/api/src/app.ts`、`work.md`。撤回方式 [Rollback Strategy]：移除 `/auth/register` 路由并删除本条审计记录。
+
+2026-07-13 17:19 +08:00 --- Issue 002 尚未定义重复邮箱冲突语义 --- 进入第二轮红阶段 [RED]，添加单个测试规定同一邮箱再次注册返回 409 与 `EMAIL_ALREADY_EXISTS`；未修改实现 --- 修改 `apps/api/test/auth-register.test.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除重复邮箱测试与本条审计记录。
+
+2026-07-13 17:20 +08:00 --- 重复邮箱测试因每次注册都返回 201 而失败 --- 进入绿阶段 [GREEN]，在应用实例内用内存集合记录已注册邮箱并返回 409 冲突；尚未引入校验、哈希与 PostgreSQL --- 修改 `apps/api/src/app.ts`、`work.md`。撤回方式 [Rollback Strategy]：移除内存邮箱集合与冲突分支，并删除本条审计记录。
+
+2026-07-13 17:21 +08:00 --- Issue 002 尚未定义无效邮箱校验语义 --- 进入第三轮红阶段 [RED]，添加单个测试规定非法邮箱返回 400 与带字段详情的 `VALIDATION_ERROR`；未修改实现 --- 修改 `apps/api/test/auth-register.test.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除无效邮箱测试与本条审计记录。
+
+2026-07-13 17:22 +08:00 --- 无效邮箱测试因仍返回 201 而失败 --- 进入绿阶段 [GREEN]，在注册前加入最小邮箱格式校验并返回字段级 `VALIDATION_ERROR`；尚未校验密码、哈希与持久化 --- 修改 `apps/api/src/app.ts`、`work.md`。撤回方式 [Rollback Strategy]：移除邮箱校验分支并删除本条审计记录。
+
+2026-07-13 17:23 +08:00 --- Issue 002 尚未定义密码最短长度校验 --- 进入第四轮红阶段 [RED]，添加单个测试规定少于 8 位的密码返回 400 与字段级 `VALIDATION_ERROR`；未修改实现 --- 修改 `apps/api/test/auth-register.test.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除过短密码测试与本条审计记录。
+
+2026-07-13 17:24 +08:00 --- 过短密码测试因仍返回 201 而失败 --- 进入绿阶段 [GREEN]，拒绝少于 8 个字符的密码并返回字段级 `VALIDATION_ERROR`；尚未引入哈希与 PostgreSQL --- 修改 `apps/api/src/app.ts`、`work.md`。撤回方式 [Rollback Strategy]：移除密码长度校验并删除本条审计记录。
+
+2026-07-13 17:40 +08:00 --- 注册实现仍停留在内存集合，未满足 Argon2、用户表与密码不落明文验收 --- 进入重构阶段 [REFACTOR]：引入 `users` 表迁移、用户仓储接缝、Argon2 哈希、内存与 PostgreSQL 仓储、密码不落库测试与可选集成测试，并同步文档 --- 修改 `packages/database/src/schema.ts`、`packages/database/src/database.ts`、`packages/database/src/index.ts`、`packages/database/drizzle/0001_users.sql`、`packages/database/drizzle/meta/_journal.json`、`apps/api/src/app.ts`、`apps/api/src/server.ts`、`apps/api/src/auth/password.ts`、`apps/api/src/auth/users.ts`、`apps/api/test/auth-register.test.ts`、`apps/api/test/auth-register.integration.test.ts`、`apps/api/package.json`、`README.md`、`docs/issues/002.md`、`docs/learning/issue-002-register.md`、`docs/learning/README.md`、`docs/demos/register.html`、`work.md`。撤回方式 [Rollback Strategy]：删除本条所列新增文件，恢复被改文件到 Issue 001 完成后的版本，并移除 `argon2` 与 API 包中的 `drizzle-orm` 依赖。
+
+2026-07-13 17:56 +08:00 --- 类型感知 ESLint 将 Vitest 的 `expect.any` 与 Fastify `response.json()` 判为不安全 `any` 使用 --- 为测试文件增加 ESLint 规则覆盖，关闭无收益的 `no-unsafe-*` 噪声，同时保留源码严格检查 --- 修改 `packages/config/eslint.config.mjs`、`work.md`。撤回方式 [Rollback Strategy]：删除测试文件规则覆盖块并删除本条审计记录。
