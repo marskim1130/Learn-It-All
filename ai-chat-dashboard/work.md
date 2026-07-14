@@ -97,3 +97,25 @@
 2026-07-14 09:22 +08:00 --- `POST /auth/logout` 因路由不存在返回 404，且原先令牌直接等于用户 ID 无法服务端作废 --- 进入绿阶段 [GREEN]，登录签发独立会话令牌写入内存会话表，`/auth/me` 查会话表，`/auth/logout` 删除会话并清除 Cookie --- 修改 `apps/api/src/app.ts`、`work.md`。撤回方式 [Rollback Strategy]：移除会话表、退出路由，并将登录令牌恢复为用户 ID，删除本条审计记录。
 
 2026-07-14 09:25 +08:00 --- Issue 003 行为测试已通过，但缺少文档、教学 Demo 与验收勾选 --- 同步学习记录、HTML Demo、README 与 Issue 验收，明确采用不透明会话令牌而非 JWT 以满足退出立即失效 --- 修改 `docs/learning/issue-003-session.md`、`docs/learning/README.md`、`docs/demos/session.html`、`docs/issues/003.md`、`README.md`、`work.md`。撤回方式 [Rollback Strategy]：删除新增学习记录与 Demo，恢复 README 与 Issue 003 勾选，并删除本条审计记录。
+
+2026-07-14 09:37 +08:00 --- Issue 004 缺少可执行的首个会话创建规格 --- 进入测试驱动开发 [TDD] 红阶段 [RED]，添加登录用户 `POST /conversations` 应创建会话并返回公开会话信息的单个失败测试，未实现 API --- 修改 `apps/api/test/conversations.test.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除 `apps/api/test/conversations.test.ts` 与本条审计记录。
+
+2026-07-14 09:40 +08:00 --- `POST /conversations` 因路由不存在返回 404，红灯符合预期 --- 进入绿阶段 [GREEN]，添加内存会话仓储与创建路由，登录用户可创建会话；尚未覆盖未登录、列表与跨用户隔离 --- 修改 `apps/api/src/conversations/repository.ts`、`apps/api/src/app.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除会话仓储与创建路由，并删除本条审计记录。
+
+2026-07-14 09:48 +08:00 --- Issue 004 尚未定义未登录创建会话语义 --- 进入第二轮红阶段 [RED]，添加未登录 `POST /conversations` 应返回 401 `UNAUTHORIZED` 的测试；未修改实现 --- 修改 `apps/api/test/conversations.test.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除未登录创建测试与本条审计记录。
+
+2026-07-14 09:49 +08:00 --- 未登录创建测试直接通过，因创建路由已校验当前用户 --- 记录为已覆盖行为，不新增代码 --- 修改 `work.md`。撤回方式 [Rollback Strategy]：删除本条验证记录。
+
+2026-07-14 09:49 +08:00 --- Issue 004 尚未定义会话列表的数据隔离 --- 进入第三轮红阶段 [RED]，添加 `GET /conversations` 只返回当前用户会话的测试；未实现列表路由 --- 修改 `apps/api/test/conversations.test.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除列表测试与本条审计记录。
+
+2026-07-14 09:50 +08:00 --- `GET /conversations` 因路由不存在返回 404 --- 进入绿阶段 [GREEN]，按当前用户 `ownerId` 列出会话；尚未覆盖详情与跨用户读取 --- 修改 `apps/api/src/app.ts`、`work.md`。撤回方式 [Rollback Strategy]：移除列表路由并删除本条审计记录。
+
+2026-07-14 09:51 +08:00 --- Issue 004 尚未定义会话详情读取 --- 进入第四轮红阶段 [RED]，添加 `GET /conversations/:id` 可读自己会话的测试；未实现详情路由 --- 修改 `apps/api/test/conversations.test.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除详情测试与本条审计记录。
+
+2026-07-14 09:52 +08:00 --- `GET /conversations/:id` 因路由不存在返回 404 --- 进入绿阶段 [GREEN]，按 `id + ownerId` 读取自己的会话详情；尚未覆盖跨用户访问 --- 修改 `apps/api/src/app.ts`、`work.md`。撤回方式 [Rollback Strategy]：移除详情路由并删除本条审计记录。
+
+2026-07-14 09:53 +08:00 --- Issue 004 尚未定义跨用户读取会话语义 --- 进入第五轮红阶段 [RED]，添加读取他人会话应返回 404 `NOT_FOUND` 的测试；未修改实现 --- 修改 `apps/api/test/conversations.test.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除跨用户读取测试与本条审计记录。
+
+2026-07-14 09:54 +08:00 --- 跨用户读取测试直接通过，因详情查询绑定 `ownerId` --- 记录为已覆盖行为，不新增代码 --- 修改 `work.md`。撤回方式 [Rollback Strategy]：删除本条验证记录。
+
+2026-07-14 09:55 +08:00 --- Issue 004 行为测试已通过，但缺少 PostgreSQL 表、数据库仓储与文档 --- 进入重构与交付：新增 `conversations` 迁移与 schema、数据库仓储接入 `server.ts`，同步学习记录、Demo、README 与验收勾选；顺带让 `/auth/me` 复用 `resolveCurrentUser` --- 修改 `packages/database/src/schema.ts`、`packages/database/src/index.ts`、`packages/database/drizzle/0002_conversations.sql`、`packages/database/drizzle/meta/_journal.json`、`apps/api/src/conversations/repository.ts`、`apps/api/src/server.ts`、`apps/api/src/app.ts`、`apps/api/test/conversations.test.ts`、`docs/learning/issue-004-conversations.md`、`docs/learning/README.md`、`docs/demos/conversations.html`、`docs/issues/004.md`、`README.md`、`work.md`。撤回方式 [Rollback Strategy]：删除本条所列新增文件，恢复被改文件到 Issue 003 完成后的版本，并删除本条审计记录。

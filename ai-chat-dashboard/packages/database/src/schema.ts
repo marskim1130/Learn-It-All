@@ -15,6 +15,23 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });
 
+/**
+ * 聊天会话表：归属单个用户，列表与详情查询始终约束 owner_id。
+ *
+ * @example
+ * import { conversations } from "@ai-chat-dashboard/database";
+ */
+export const conversations = pgTable("conversations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  ownerId: uuid("owner_id")
+    .notNull()
+    .references(() => users.id),
+  title: text("title").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+});
+
 export const schema = {
   users,
+  conversations,
 };

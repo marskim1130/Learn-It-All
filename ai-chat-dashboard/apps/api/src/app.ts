@@ -6,12 +6,17 @@ import {
   EmailAlreadyExistsError,
   type UserRepository,
 } from "./auth/users.js";
+import {
+  createMemoryConversationRepository,
+  type ConversationRepository,
+} from "./conversations/repository.js";
 
 interface AppDependencies {
   database: {
     checkConnection(): Promise<boolean>;
   };
   users?: UserRepository;
+  conversations?: ConversationRepository;
 }
 
 /**
@@ -27,6 +32,8 @@ interface AppDependencies {
 export function buildApp(dependencies?: AppDependencies) {
   const app = Fastify();
   const users = dependencies?.users ?? createMemoryUserRepository();
+  const conversations =
+    dependencies?.conversations ?? createMemoryConversationRepository();
   /** 进程内会话表：access_token -> userId。退出时删除条目使旧令牌失效。 */
   const sessions = new Map<string, string>();
 
@@ -188,27 +195,7 @@ export function buildApp(dependencies?: AppDependencies) {
    * });
    */
   app.get("/auth/me", async (request, reply) => {
-    const accessToken = readAccessToken(request.headers.cookie);
-    if (!accessToken) {
-      return reply.status(401).send({
-        error: {
-          code: "UNAUTHORIZED",
-          message: "未登录或会话已失效",
-        },
-      });
-    }
-
-    const userId = sessions.get(accessToken);
-    if (!userId) {
-      return reply.status(401).send({
-        error: {
-          code: "UNAUTHORIZED",
-          message: "未登录或会话已失效",
-        },
-      });
-    }
-
-    const user = await users.findById(userId);
+    const user = await resolveCurrentUser(request.headers.cookie, sessions, users);
     if (!user) {
       return reply.status(401).send({
         error: {
@@ -250,7 +237,143 @@ export function buildApp(dependencies?: AppDependencies) {
     return reply.status(204).send();
   });
 
+  /**
+   * 为当前登录用户创建聊天会话。
+   *
+   * @example
+   * const response = await app.inject({
+   *   method: "POST",
+   *   url: "/conversations",
+   *   headers: { cookie: "access_token=<token>" },
+   *   payload: { title: "学习计划" },
+   * });
+   * // 201 -> { conversation: { id, title, createdAt, updatedAt } }
+   */
+  app.post("/conversations", async (request, reply) => {
+    const user = await resolveCurrentUser(request.headers.cookie, sessions, users);
+    if (!user) {
+      return reply.status(401).send({
+        error: {
+          code: "UNAUTHORIZED",
+          message: "未登录或会话已失效",
+        },
+      });
+    }
+
+    const body = request.body as { title?: string };
+    const title =
+      typeof body.title === "string" && body.title.trim().length > 0
+        ? body.title.trim()
+        : "新会话";
+
+    const conversation = await conversations.create({
+      ownerId: user.id,
+      title,
+    });
+
+    return reply.status(201).send({
+      conversation: {
+        id: conversation.id,
+        title: conversation.title,
+        createdAt: conversation.createdAt.toISOString(),
+        updatedAt: conversation.updatedAt.toISOString(),
+      },
+    });
+  });
+
+  /**
+   * 列出当前登录用户的聊天会话。
+   *
+   * @example
+   * const response = await app.inject({
+   *   method: "GET",
+   *   url: "/conversations",
+   *   headers: { cookie: "access_token=<token>" },
+   * });
+   */
+  app.get("/conversations", async (request, reply) => {
+    const user = await resolveCurrentUser(request.headers.cookie, sessions, users);
+    if (!user) {
+      return reply.status(401).send({
+        error: {
+          code: "UNAUTHORIZED",
+          message: "未登录或会话已失效",
+        },
+      });
+    }
+
+    const items = await conversations.listByOwner(user.id);
+    return {
+      conversations: items.map((item) => ({
+        id: item.id,
+        title: item.title,
+        createdAt: item.createdAt.toISOString(),
+        updatedAt: item.updatedAt.toISOString(),
+      })),
+    };
+  });
+
+  /**
+   * 读取当前用户拥有的单个会话详情。
+   *
+   * @example
+   * const response = await app.inject({
+   *   method: "GET",
+   *   url: "/conversations/<id>",
+   *   headers: { cookie: "access_token=<token>" },
+   * });
+   */
+  app.get("/conversations/:id", async (request, reply) => {
+    const user = await resolveCurrentUser(request.headers.cookie, sessions, users);
+    if (!user) {
+      return reply.status(401).send({
+        error: {
+          code: "UNAUTHORIZED",
+          message: "未登录或会话已失效",
+        },
+      });
+    }
+
+    const { id } = request.params as { id: string };
+    const conversation = await conversations.findByIdForOwner(id, user.id);
+    if (!conversation) {
+      return reply.status(404).send({
+        error: {
+          code: "NOT_FOUND",
+          message: "会话不存在",
+        },
+      });
+    }
+
+    return {
+      conversation: {
+        id: conversation.id,
+        title: conversation.title,
+        createdAt: conversation.createdAt.toISOString(),
+        updatedAt: conversation.updatedAt.toISOString(),
+      },
+    };
+  });
+
   return app;
+}
+
+async function resolveCurrentUser(
+  cookieHeader: string | undefined,
+  sessions: Map<string, string>,
+  users: UserRepository,
+) {
+  const accessToken = readAccessToken(cookieHeader);
+  if (!accessToken) {
+    return null;
+  }
+
+  const userId = sessions.get(accessToken);
+  if (!userId) {
+    return null;
+  }
+
+  return users.findById(userId);
 }
 
 function readAccessToken(cookieHeader: string | undefined): string | undefined {

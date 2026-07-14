@@ -7,6 +7,7 @@
 - Issue 001：工程骨架已建立（Next.js Web、Fastify API、PostgreSQL、Docker Compose、CI）。
 - Issue 002：用户注册 API 已完成（Argon2 密码摘要、邮箱唯一约束、稳定错误码）。
 - Issue 003：登录与身份会话已完成（HttpOnly Cookie、当前用户、退出失效）。
+- Issue 004：聊天会话创建/列表/详情已完成（按用户隔离，跨用户 404）。
 
 ## 环境要求
 
@@ -32,6 +33,9 @@ pnpm dev
 - 登录：`POST http://localhost:3001/auth/login`
 - 当前身份：`GET http://localhost:3001/auth/me`
 - 退出：`POST http://localhost:3001/auth/logout`
+- 会话列表：`GET http://localhost:3001/conversations`
+- 创建会话：`POST http://localhost:3001/conversations`
+- 会话详情：`GET http://localhost:3001/conversations/:id`
 
 ### 注册与登录示例
 
@@ -47,10 +51,19 @@ Invoke-RestMethod -Method Post -Uri http://localhost:3001/auth/login `
   -WebSession $session
 
 Invoke-RestMethod -Uri http://localhost:3001/auth/me -WebSession $session
+
+$created = Invoke-RestMethod -Method Post -Uri http://localhost:3001/conversations `
+  -ContentType "application/json" `
+  -Body '{"title":"学习计划"}' `
+  -WebSession $session
+Invoke-RestMethod -Uri http://localhost:3001/conversations -WebSession $session
+Invoke-RestMethod -Uri "http://localhost:3001/conversations/$($created.conversation.id)" `
+  -WebSession $session
+
 Invoke-WebRequest -Method Post -Uri http://localhost:3001/auth/logout -WebSession $session
 ```
 
-注册成功返回 `201`；登录成功返回 `200` 并设置 `HttpOnly` Cookie；错误凭据返回 `401 INVALID_CREDENTIALS`；未认证访问 `/auth/me` 返回 `401 UNAUTHORIZED`。
+注册成功返回 `201`；登录成功返回 `200` 并设置 `HttpOnly` Cookie；错误凭据返回 `401 INVALID_CREDENTIALS`；未认证访问 `/auth/me` 返回 `401 UNAUTHORIZED`。创建会话返回 `201`；列表与详情只包含当前用户数据；跨用户详情返回 `404 NOT_FOUND`。
 
 若未安装 Docker，可以运行不依赖真实 PostgreSQL 的测试，但数据库集成测试会被跳过。
 
@@ -73,4 +86,4 @@ pnpm build
 
 ## 下一步
 
-按照 `docs/issues/README.md` 从 Issue 004 创建并查看聊天会话继续实现。
+按照 `docs/issues/README.md` 从 Issue 005 管理已有聊天会话继续实现。

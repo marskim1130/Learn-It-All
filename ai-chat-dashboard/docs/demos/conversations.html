@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>聊天会话 Demo</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: "Segoe UI", system-ui, sans-serif;
+      }
+      body {
+        margin: 0 auto;
+        max-width: 48rem;
+        padding: 1.5rem;
+        line-height: 1.6;
+      }
+      code,
+      pre {
+        font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      }
+      pre {
+        overflow: auto;
+        padding: 0.75rem 1rem;
+        border: 1px solid color-mix(in oklab, CanvasText 20%, Canvas);
+        border-radius: 0.5rem;
+      }
+      label {
+        display: block;
+        margin-top: 0.75rem;
+      }
+      input,
+      button {
+        font: inherit;
+        margin-top: 0.25rem;
+      }
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 0.5rem 0.75rem;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 1rem;
+      }
+      button {
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+      }
+      #result {
+        margin-top: 1rem;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>聊天会话 Demo</h1>
+    <p>
+      演示创建、列表、详情与数据隔离：
+      <code>POST /conversations</code>、<code>GET /conversations</code>、
+      <code>GET /conversations/:id</code>。
+    </p>
+
+    <h2>API</h2>
+    <pre>
+POST /conversations
+{ "title": "学习计划" }  // title 可选，默认“新会话”
+→ 201 { conversation }
+
+GET /conversations
+→ 200 { conversations: [...] }  // 仅当前用户
+
+GET /conversations/:id
+→ 200 自己的会话 / 404 NOT_FOUND（他人或不存在）</pre>
+
+    <h2>设计思想</h2>
+    <ul>
+      <li>所有查询绑定 <code>owner_id</code>，授权在服务端完成。</li>
+      <li>跨用户与不存在统一 404，避免资源枚举。</li>
+      <li>仓储接缝便于内存测试与 PostgreSQL 实现切换。</li>
+    </ul>
+
+    <h2>可运行 Demo</h2>
+    <p>先注册/登录（见会话 Demo），再创建会话。浏览器需允许携带 Cookie。</p>
+    <form id="conversation-form">
+      <label>
+        API 地址
+        <input id="base-url" value="http://localhost:3001" />
+      </label>
+      <label>
+        邮箱
+        <input id="email" type="email" value="alice@example.com" />
+      </label>
+      <label>
+        密码
+        <input id="password" type="password" value="password123" />
+      </label>
+      <label>
+        会话标题
+        <input id="title" value="学习计划" />
+      </label>
+      <label>
+        会话 ID（详情）
+        <input id="conversation-id" placeholder="创建后自动填入" />
+      </label>
+      <div class="actions">
+        <button type="button" id="login-btn">登录</button>
+        <button type="button" id="create-btn">创建会话</button>
+        <button type="button" id="list-btn">列出会话</button>
+        <button type="button" id="detail-btn">查看详情</button>
+      </div>
+    </form>
+    <pre id="result">等待操作…</pre>
+
+    <h2>常见错误</h2>
+    <ul>
+      <li>未登录就创建，应得到 401。</li>
+      <li>用别人的会话 ID 访问详情，应得到 404 而不是 403。</li>
+      <li>前端按 owner 过滤列表，却不在 API 侧约束。</li>
+    </ul>
+
+    <script>
+      const result = document.getElementById("result");
+      const baseUrlInput = document.getElementById("base-url");
+      const emailInput = document.getElementById("email");
+      const passwordInput = document.getElementById("password");
+      const titleInput = document.getElementById("title");
+      const idInput = document.getElementById("conversation-id");
+
+      async function call(path, options = {}) {
+        const baseUrl = baseUrlInput.value.replace(/\/$/, "");
+        const response = await fetch(`${baseUrl}${path}`, {
+          credentials: "include",
+          headers: {
+            "content-type": "application/json",
+            ...(options.headers ?? {}),
+          },
+          ...options,
+        });
+        const text = await response.text();
+        let body = text;
+        try {
+          body = text ? JSON.parse(text) : null;
+        } catch {
+          // keep raw text
+        }
+        result.textContent = `${options.method ?? "GET"} ${path}\nstatus: ${response.status}\n\n${
+          typeof body === "string" ? body : JSON.stringify(body, null, 2)
+        }`;
+        return { response, body };
+      }
+
+      document.getElementById("login-btn").addEventListener("click", () =>
+        call("/auth/login", {
+          method: "POST",
+          body: JSON.stringify({
+            email: emailInput.value,
+            password: passwordInput.value,
+          }),
+        }),
+      );
+
+      document.getElementById("create-btn").addEventListener("click", async () => {
+        const { body } = await call("/conversations", {
+          method: "POST",
+          body: JSON.stringify({ title: titleInput.value }),
+        });
+        if (body?.conversation?.id) {
+          idInput.value = body.conversation.id;
+        }
+      });
+
+      document.getElementById("list-btn").addEventListener("click", () =>
+        call("/conversations"),
+      );
+
+      document.getElementById("detail-btn").addEventListener("click", () => {
+        if (!idInput.value) {
+          result.textContent = "请先填写会话 ID，或先创建会话。";
+          return;
+        }
+        call(`/conversations/${idInput.value}`);
+      });
+    </script>
+  </body>
+</html>
