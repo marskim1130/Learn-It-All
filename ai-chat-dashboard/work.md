@@ -181,3 +181,5 @@
 2026-07-14 14:05 +08:00 --- Issue 014 缺少关联 ID、日志脱敏与优雅关闭规格 --- 进入测试驱动开发 [TDD] 红阶段 [RED]，添加请求关联 ID 响应头与日志脱敏的失败测试，未实现加固模块 --- 修改 `apps/api/test/runtime-hardening.test.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除该测试文件与本条审计记录。
 
 2026-07-14 14:10 +08:00 --- Issue 014 需要关联 ID、脱敏日志、关闭中拒绝请求与信号钩子 --- 实现 observability 模块并接入 app/server/worker，补充契约测试与文档验收 --- 修改 `apps/api/src/observability/*`、`apps/api/src/app.ts`、`apps/api/src/server.ts`、`apps/api/src/title-worker-main.ts`、`apps/api/test/runtime-hardening.test.ts`、`docs/learning/issue-014-runtime-hardening.md`、`docs/learning/README.md`、`docs/issues/014.md`、`README.md`、`work.md`。撤回方式 [Rollback Strategy]：删除 observability 与加固测试/文档，恢复 app/server/worker 到 Issue 013 完成后版本，并删除本条审计记录。
+
+2026-07-14 14:15 +08:00 --- Issue 015 缺少串联旅程测试、CI Redis 与运行手册 --- 新增核心用户旅程 e2e（假模型）、CI 增加 Redis/CHAT_PROVIDER=echo，并补充 RUNBOOK 与验收勾选 --- 修改 `apps/api/test/core-journey.e2e.test.ts`、`.github/workflows/ci.yml`、`docs/RUNBOOK.md`、`docs/learning/issue-015-core-journey.md`、`docs/learning/README.md`、`docs/issues/015.md`、`README.md`、`work.md`。撤回方式 [Rollback Strategy]：删除 e2e/RUNBOOK/学习记录，恢复 CI 与 README/Issue 015，并删除本条审计记录。

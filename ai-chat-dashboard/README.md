@@ -18,6 +18,8 @@
 - Issue 012：登录失败限流已完成（Redis/内存、TTL、429）。
 - Issue 013：首条消息后后台生成会话标题已完成（BullMQ/noop、幂等 Worker）。
 - Issue 014：运行加固已完成（关联 ID、日志脱敏、存活/就绪、优雅关闭）。
+- Issue 015：核心用户旅程 e2e、CI Redis 与运行手册已完成。
+
 ## 环境要求
 
 - Node.js 22 或更高版本。
@@ -122,9 +124,10 @@ pnpm build
 
 - 产品需求：`docs/PRD.md`
 - 架构决策：`docs/decisions/0001-foundation.md`
+- 运行手册：`docs/RUNBOOK.md`
 - 学习记录索引：`docs/learning/README.md`
 - 修改审计：`work.md`
 
 ## 下一步
 
-按照 `docs/issues/README.md` 从 Issue 015 验证完整用户旅程继续实现。
+全部 15 个垂直切片已完成。可按 `docs/RUNBOOK.md` 从干净环境启动验收，或继续打磨 Web 聊天产品页。

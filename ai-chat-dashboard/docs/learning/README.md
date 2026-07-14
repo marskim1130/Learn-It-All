@@ -16,7 +16,7 @@
 - [Issue 012：登录限流](issue-012-login-rate-limit.md)
 - [Issue 013：后台生成会话标题](issue-013-title-jobs.md)
 - [Issue 014：运行加固与故障处理](issue-014-runtime-hardening.md)
-- TypeScript：泛型 [Generics]、类型推导 [Type Inference]、工具类型 [Utility Types]。
+- [Issue 015：完整用户旅程](issue-015-core-journey.md)- TypeScript：泛型 [Generics]、类型推导 [Type Inference]、工具类型 [Utility Types]。
 - React：状态所有权 [State Ownership]、并发渲染 [Concurrent Rendering]、性能测量和虚拟化 [Virtualization]。
 - Next.js：App Router、服务器组件 [Server Components]、客户端边界 [Client Boundary]。
 - Node.js：事件循环 [Event Loop]、流 [Streams]、背压 [Backpressure]、进程信号与优雅关闭 [Graceful Shutdown]。
