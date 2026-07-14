@@ -15,6 +15,7 @@
 - Issue 009：Prompt 模板 CRUD 与筛选已完成（私有隔离、tags、q 搜索）。
 - Issue 010：模板变量提取/渲染与消息来源追踪已完成。
 - Issue 011：消息文本/Markdown 附件上传与元数据追踪已完成。
+- Issue 012：登录失败限流已完成（Redis/内存、TTL、429）。
 
 ## 环境要求
 
@@ -27,7 +28,7 @@
 ```powershell
 Copy-Item .env.example .env
 pnpm install
-docker compose up -d postgres
+docker compose up -d postgres redis
 pnpm db:migrate
 pnpm dev
 ```
@@ -38,7 +39,7 @@ pnpm dev
 - 存活检查：`http://localhost:3001/health/live`
 - 就绪检查：`http://localhost:3001/health/ready`
 - 用户注册：`POST http://localhost:3001/auth/register`
-- 登录：`POST http://localhost:3001/auth/login`
+- 登录：`POST http://localhost:3001/auth/login`（失败 5 次后 429，见限流）
 - 当前身份：`GET http://localhost:3001/auth/me`
 - 退出：`POST http://localhost:3001/auth/logout`
 - 会话列表：`GET http://localhost:3001/conversations`
@@ -125,4 +126,4 @@ pnpm build
 
 ## 下一步
 
-按照 `docs/issues/README.md` 从 Issue 012 限制登录请求频率继续实现。
+按照 `docs/issues/README.md` 从 Issue 013 后台生成会话标题继续实现。

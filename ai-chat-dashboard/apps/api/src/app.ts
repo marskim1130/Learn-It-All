@@ -1,5 +1,9 @@
 import Fastify from "fastify";
 
+import {
+  createMemoryLoginRateLimiter,
+  type LoginRateLimiter,
+} from "./auth/login-rate-limit.js";
 import { hashPassword, verifyPassword } from "./auth/password.js";
 import {
   createMemoryUserRepository,
@@ -44,6 +48,7 @@ interface AppDependencies {
   messages?: MessageRepository;
   promptTemplates?: PromptTemplateRepository;
   chatModel?: ChatModelProvider;
+  loginRateLimiter?: LoginRateLimiter;
 }
 
 /**
@@ -76,6 +81,8 @@ export function buildApp(dependencies?: AppDependencies) {
   const promptTemplates =
     dependencies?.promptTemplates ?? createMemoryPromptTemplateRepository();
   const chatModel = dependencies?.chatModel ?? createEchoChatModelProvider();
+  const loginRateLimiter =
+    dependencies?.loginRateLimiter ?? createMemoryLoginRateLimiter();
   /** 进程内会话表：access_token -> userId。退出时删除条目使旧令牌失效。 */
   const sessions = new Map<string, string>();
 
@@ -199,8 +206,21 @@ export function buildApp(dependencies?: AppDependencies) {
     const email = body.email ?? "";
     const password = body.password ?? "";
 
+    const precheck = await loginRateLimiter.check(email);
+    if (precheck.limited) {
+      return reply.status(429).send({
+        error: {
+          code: "TOO_MANY_REQUESTS",
+          message: "登录尝试过于频繁，请稍后再试",
+          retryAfterSeconds: precheck.retryAfterSeconds,
+        },
+      });
+    }
+
     const user = await users.findByEmail(email);
     if (!user || !(await verifyPassword(password, user.passwordHash))) {
+      // 本次失败仍返回 401；达到阈值后的后续请求由 precheck 返回 429
+      await loginRateLimiter.registerFailure(email);
       return reply.status(401).send({
         error: {
           code: "INVALID_CREDENTIALS",
@@ -208,6 +228,8 @@ export function buildApp(dependencies?: AppDependencies) {
         },
       });
     }
+
+    await loginRateLimiter.clear(email);
 
     const accessToken = crypto.randomUUID();
     sessions.set(accessToken, user.id);

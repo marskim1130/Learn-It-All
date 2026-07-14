@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>登录限流 Demo</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: "Segoe UI", system-ui, sans-serif;
+      }
+      body {
+        margin: 0 auto;
+        max-width: 42rem;
+        padding: 1.5rem;
+        line-height: 1.6;
+      }
+      label {
+        display: block;
+        margin-top: 0.75rem;
+      }
+      input,
+      button {
+        font: inherit;
+        margin-top: 0.25rem;
+      }
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 0.5rem 0.75rem;
+      }
+      .actions {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        margin-top: 1rem;
+      }
+      button {
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+      }
+      pre {
+        white-space: pre-wrap;
+        border: 1px solid color-mix(in oklab, CanvasText 20%, Canvas);
+        border-radius: 0.5rem;
+        padding: 0.75rem 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>登录限流 Demo</h1>
+    <p>
+      连续错误密码 5 次后，第 6 次应返回 <code>429 TOO_MANY_REQUESTS</code>。
+      限流键仅为 <code>login:fail:{email}</code>，不含密码。
+    </p>
+    <label>
+      API
+      <input id="base-url" value="http://localhost:3001" />
+    </label>
+    <label>
+      邮箱
+      <input id="email" value="alice@example.com" />
+    </label>
+    <label>
+      错误密码
+      <input id="password" value="wrong-password" />
+    </label>
+    <div class="actions">
+      <button type="button" id="fail-btn">发送一次错误登录</button>
+      <button type="button" id="burst-btn">连发 6 次错误登录</button>
+    </div>
+    <pre id="out">等待操作…</pre>
+    <script>
+      const out = document.getElementById("out");
+      const baseUrl = () => document.getElementById("base-url").value.replace(/\/$/, "");
+
+      async function loginOnce() {
+        const response = await fetch(`${baseUrl()}/auth/login`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            email: document.getElementById("email").value,
+            password: document.getElementById("password").value,
+          }),
+        });
+        const text = await response.text();
+        return `status: ${response.status}\n${text}`;
+      }
+
+      document.getElementById("fail-btn").addEventListener("click", async () => {
+        out.textContent = await loginOnce();
+      });
+
+      document.getElementById("burst-btn").addEventListener("click", async () => {
+        const lines = [];
+        for (let i = 1; i <= 6; i += 1) {
+          lines.push(`#${i}\n${await loginOnce()}`);
+        }
+        out.textContent = lines.join("\n\n");
+      });
+    </script>
+  </body>
+</html>

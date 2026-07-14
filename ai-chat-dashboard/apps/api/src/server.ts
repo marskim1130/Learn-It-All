@@ -1,6 +1,7 @@
 import { createDatabase, readDatabaseConfig } from "@ai-chat-dashboard/database";
 
 import { buildApp } from "./app.js";
+import { resolveLoginRateLimiter } from "./auth/redis.js";
 import { createDatabaseUserRepository } from "./auth/users.js";
 import { resolveChatModelProvider } from "./chat/config.js";
 import { createDatabaseConversationRepository } from "./conversations/repository.js";
@@ -12,6 +13,9 @@ const host = process.env.API_HOST ?? "0.0.0.0";
 
 const database = createDatabase(readDatabaseConfig());
 const chatModel = resolveChatModelProvider(process.env);
+const { limiter: loginRateLimiter, close: closeRateLimiter } =
+  await resolveLoginRateLimiter(process.env);
+
 const app = buildApp({
   database: {
     checkConnection: async () => {
@@ -28,9 +32,15 @@ const app = buildApp({
   messages: createDatabaseMessageRepository(database),
   promptTemplates: createDatabasePromptTemplateRepository(database),
   chatModel,
+  loginRateLimiter,
 });
 
-app.addHook("onClose", async () => database.close());
+app.addHook("onClose", async () => {
+  await database.close();
+  if (closeRateLimiter) {
+    await closeRateLimiter();
+  }
+});
 
 try {
   await app.listen({ host, port });
