@@ -6,6 +6,7 @@
 
 - Issue 001：工程骨架已建立（Next.js Web、Fastify API、PostgreSQL、Docker Compose、CI）。
 - Issue 002：用户注册 API 已完成（Argon2 密码摘要、邮箱唯一约束、稳定错误码）。
+- Issue 003：登录与身份会话已完成（HttpOnly Cookie、当前用户、退出失效）。
 
 ## 环境要求
 
@@ -28,16 +29,28 @@ pnpm dev
 - 存活检查：`http://localhost:3001/health/live`
 - 就绪检查：`http://localhost:3001/health/ready`
 - 用户注册：`POST http://localhost:3001/auth/register`
+- 登录：`POST http://localhost:3001/auth/login`
+- 当前身份：`GET http://localhost:3001/auth/me`
+- 退出：`POST http://localhost:3001/auth/logout`
 
-### 注册示例
+### 注册与登录示例
 
 ```powershell
 Invoke-RestMethod -Method Post -Uri http://localhost:3001/auth/register `
   -ContentType "application/json" `
   -Body '{"email":"alice@example.com","password":"password123"}'
+
+$session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+Invoke-RestMethod -Method Post -Uri http://localhost:3001/auth/login `
+  -ContentType "application/json" `
+  -Body '{"email":"alice@example.com","password":"password123"}' `
+  -WebSession $session
+
+Invoke-RestMethod -Uri http://localhost:3001/auth/me -WebSession $session
+Invoke-WebRequest -Method Post -Uri http://localhost:3001/auth/logout -WebSession $session
 ```
 
-成功返回 `201` 与公开用户信息；重复邮箱返回 `409 EMAIL_ALREADY_EXISTS`；无效输入返回 `400 VALIDATION_ERROR`。
+注册成功返回 `201`；登录成功返回 `200` 并设置 `HttpOnly` Cookie；错误凭据返回 `401 INVALID_CREDENTIALS`；未认证访问 `/auth/me` 返回 `401 UNAUTHORIZED`。
 
 若未安装 Docker，可以运行不依赖真实 PostgreSQL 的测试，但数据库集成测试会被跳过。
 
@@ -60,4 +73,4 @@ pnpm build
 
 ## 下一步
 
-按照 `docs/issues/README.md` 从 Issue 003 登录与身份会话继续实现。
+按照 `docs/issues/README.md` 从 Issue 004 创建并查看聊天会话继续实现。

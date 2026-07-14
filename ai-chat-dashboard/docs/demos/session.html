@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>登录与身份会话 Demo</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: "Segoe UI", system-ui, sans-serif;
+      }
+      body {
+        margin: 0 auto;
+        max-width: 48rem;
+        padding: 1.5rem;
+        line-height: 1.6;
+      }
+      code,
+      pre {
+        font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      }
+      pre {
+        overflow: auto;
+        padding: 0.75rem 1rem;
+        border: 1px solid color-mix(in oklab, CanvasText 20%, Canvas);
+        border-radius: 0.5rem;
+      }
+      label {
+        display: block;
+        margin-top: 0.75rem;
+      }
+      input,
+      button {
+        font: inherit;
+        margin-top: 0.25rem;
+      }
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 0.5rem 0.75rem;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 1rem;
+      }
+      button {
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+      }
+      #result {
+        margin-top: 1rem;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>登录与身份会话 Demo</h1>
+    <p>
+      演示 <code>POST /auth/login</code>、<code>GET /auth/me</code>、
+      <code>POST /auth/logout</code>：HttpOnly Cookie、统一错误凭据、退出后会话失效。
+    </p>
+
+    <h2>API</h2>
+    <pre>
+POST /auth/login
+{ "email": "alice@example.com", "password": "password123" }
+→ 200 + Set-Cookie: access_token=...; HttpOnly; SameSite=Lax
+
+GET /auth/me
+Cookie: access_token=...
+→ 200 { user } 或 401 UNAUTHORIZED
+
+POST /auth/logout
+→ 204 + 清空 Cookie；旧令牌立即失效</pre>
+
+    <h2>设计思想</h2>
+    <ul>
+      <li>错误凭据统一 <code>INVALID_CREDENTIALS</code>，避免账户枚举。</li>
+      <li>令牌只走 Cookie，不进 JSON 响应体。</li>
+      <li>服务端会话表保证退出后旧 Cookie 不能继续使用。</li>
+    </ul>
+
+    <h2>可运行 Demo</h2>
+    <p>
+      先启动 API（默认 <code>http://localhost:3001</code>）。浏览器需允许跨站 Cookie
+      时注意同源或 CORS 凭证；本页默认请求同源 API 地址。
+    </p>
+    <form id="session-form">
+      <label>
+        API 地址
+        <input id="base-url" value="http://localhost:3001" />
+      </label>
+      <label>
+        邮箱
+        <input id="email" type="email" value="alice@example.com" required />
+      </label>
+      <label>
+        密码
+        <input id="password" type="password" value="password123" required />
+      </label>
+      <div class="actions">
+        <button type="button" id="register-btn">注册</button>
+        <button type="button" id="login-btn">登录</button>
+        <button type="button" id="me-btn">当前身份</button>
+        <button type="button" id="logout-btn">退出</button>
+      </div>
+    </form>
+    <pre id="result">等待操作…</pre>
+
+    <h2>常见错误</h2>
+    <ul>
+      <li>前端把 token 存 localStorage，扩大 XSS 风险。</li>
+      <li>错误密码与邮箱不存在返回不同文案。</li>
+      <li>只清 Cookie、服务端不删会话，旧令牌仍有效。</li>
+    </ul>
+
+    <script>
+      const result = document.getElementById("result");
+      const baseUrlInput = document.getElementById("base-url");
+      const emailInput = document.getElementById("email");
+      const passwordInput = document.getElementById("password");
+
+      async function call(path, options = {}) {
+        const baseUrl = baseUrlInput.value.replace(/\/$/, "");
+        const response = await fetch(`${baseUrl}${path}`, {
+          credentials: "include",
+          headers: {
+            "content-type": "application/json",
+            ...(options.headers ?? {}),
+          },
+          ...options,
+        });
+        const text = await response.text();
+        let body = text;
+        try {
+          body = text ? JSON.stringify(JSON.parse(text), null, 2) : "(empty)";
+        } catch {
+          // keep raw text
+        }
+        result.textContent = `${options.method ?? "GET"} ${path}\nstatus: ${response.status}\n\n${body}`;
+      }
+
+      document.getElementById("register-btn").addEventListener("click", () =>
+        call("/auth/register", {
+          method: "POST",
+          body: JSON.stringify({
+            email: emailInput.value,
+            password: passwordInput.value,
+          }),
+        }),
+      );
+
+      document.getElementById("login-btn").addEventListener("click", () =>
+        call("/auth/login", {
+          method: "POST",
+          body: JSON.stringify({
+            email: emailInput.value,
+            password: passwordInput.value,
+          }),
+        }),
+      );
+
+      document.getElementById("me-btn").addEventListener("click", () => call("/auth/me"));
+
+      document.getElementById("logout-btn").addEventListener("click", () =>
+        call("/auth/logout", { method: "POST" }),
+      );
+    </script>
+  </body>
+</html>

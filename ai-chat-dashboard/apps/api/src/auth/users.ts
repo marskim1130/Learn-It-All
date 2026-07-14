@@ -23,6 +23,7 @@ export interface CreateUserInput {
 export interface UserRepository {
   create(input: CreateUserInput): Promise<StoredUser>;
   findByEmail(email: string): Promise<StoredUser | null>;
+  findById(id: string): Promise<StoredUser | null>;
 }
 
 /**
@@ -33,11 +34,12 @@ export interface UserRepository {
  * await users.create({ email: "a@example.com", passwordHash: "hash" });
  */
 export function createMemoryUserRepository(seed: StoredUser[] = []): UserRepository {
-  const records = new Map(seed.map((user) => [user.email, user]));
+  const byEmail = new Map(seed.map((user) => [user.email, user]));
+  const byId = new Map(seed.map((user) => [user.id, user]));
 
   return {
     async create(input) {
-      if (records.has(input.email)) {
+      if (byEmail.has(input.email)) {
         throw new EmailAlreadyExistsError(input.email);
       }
 
@@ -47,11 +49,15 @@ export function createMemoryUserRepository(seed: StoredUser[] = []): UserReposit
         passwordHash: input.passwordHash,
         createdAt: new Date(),
       };
-      records.set(user.email, user);
+      byEmail.set(user.email, user);
+      byId.set(user.id, user);
       return user;
     },
     async findByEmail(email) {
-      return records.get(email) ?? null;
+      return byEmail.get(email) ?? null;
+    },
+    async findById(id) {
+      return byId.get(id) ?? null;
     },
   };
 }
@@ -98,6 +104,20 @@ export function createDatabaseUserRepository(database: Database): UserRepository
         })
         .from(users)
         .where(eq(users.email, email))
+        .limit(1);
+
+      return user ?? null;
+    },
+    async findById(id) {
+      const [user] = await database.client
+        .select({
+          id: users.id,
+          email: users.email,
+          passwordHash: users.passwordHash,
+          createdAt: users.createdAt,
+        })
+        .from(users)
+        .where(eq(users.id, id))
         .limit(1);
 
       return user ?? null;

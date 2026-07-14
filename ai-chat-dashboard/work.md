@@ -69,3 +69,31 @@
 2026-07-13 17:40 +08:00 --- 注册实现仍停留在内存集合，未满足 Argon2、用户表与密码不落明文验收 --- 进入重构阶段 [REFACTOR]：引入 `users` 表迁移、用户仓储接缝、Argon2 哈希、内存与 PostgreSQL 仓储、密码不落库测试与可选集成测试，并同步文档 --- 修改 `packages/database/src/schema.ts`、`packages/database/src/database.ts`、`packages/database/src/index.ts`、`packages/database/drizzle/0001_users.sql`、`packages/database/drizzle/meta/_journal.json`、`apps/api/src/app.ts`、`apps/api/src/server.ts`、`apps/api/src/auth/password.ts`、`apps/api/src/auth/users.ts`、`apps/api/test/auth-register.test.ts`、`apps/api/test/auth-register.integration.test.ts`、`apps/api/package.json`、`README.md`、`docs/issues/002.md`、`docs/learning/issue-002-register.md`、`docs/learning/README.md`、`docs/demos/register.html`、`work.md`。撤回方式 [Rollback Strategy]：删除本条所列新增文件，恢复被改文件到 Issue 001 完成后的版本，并移除 `argon2` 与 API 包中的 `drizzle-orm` 依赖。
 
 2026-07-13 17:56 +08:00 --- 类型感知 ESLint 将 Vitest 的 `expect.any` 与 Fastify `response.json()` 判为不安全 `any` 使用 --- 为测试文件增加 ESLint 规则覆盖，关闭无收益的 `no-unsafe-*` 噪声，同时保留源码严格检查 --- 修改 `packages/config/eslint.config.mjs`、`work.md`。撤回方式 [Rollback Strategy]：删除测试文件规则覆盖块并删除本条审计记录。
+
+## 2026-07-14
+
+2026-07-14 09:12 +08:00 --- Issue 003 缺少可执行的首个登录行为规格 --- 进入测试驱动开发 [TDD] 红阶段 [RED]，添加 `POST /auth/login` 有效凭据应返回用户并设置 HttpOnly Cookie 的单个失败测试，未实现 API --- 修改 `apps/api/test/auth-session.test.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除 `apps/api/test/auth-session.test.ts` 与本条审计记录。
+
+2026-07-14 09:15 +08:00 --- `POST /auth/login` 因路由不存在返回 404，红灯符合预期 --- 进入绿阶段 [GREEN]，添加密码校验与最小登录路由，成功时设置 `access_token` HttpOnly Cookie；令牌暂用用户 ID，尚未实现 `/auth/me` 与退出 --- 修改 `apps/api/src/auth/password.ts`、`apps/api/src/app.ts`、`work.md`。撤回方式 [Rollback Strategy]：移除登录路由与 `verifyPassword`，并删除本条审计记录。
+
+2026-07-14 09:16 +08:00 --- Issue 003 尚未定义错误密码失败语义 --- 进入第二轮红阶段 [RED]，添加单个测试规定错误密码返回 401 与 `INVALID_CREDENTIALS`，且不设置 Cookie；未修改实现 --- 修改 `apps/api/test/auth-session.test.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除错误密码测试与本条审计记录。
+
+2026-07-14 09:17 +08:00 --- 错误密码测试直接通过，因首轮绿实现已统一返回 `INVALID_CREDENTIALS` --- 记录为已覆盖行为，不新增代码 --- 修改 `work.md`。撤回方式 [Rollback Strategy]：删除本条验证记录。
+
+2026-07-14 09:17 +08:00 --- Issue 003 需要证明不存在邮箱与错误密码返回同一错误码 --- 进入第三轮红阶段 [RED]，添加不存在邮箱登录返回 401 `INVALID_CREDENTIALS` 的测试；未修改实现 --- 修改 `apps/api/test/auth-session.test.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除不存在邮箱测试与本条审计记录。
+
+2026-07-14 09:18 +08:00 --- 不存在邮箱测试直接通过，登录失败路径已统一 --- 记录为已覆盖行为，不新增代码 --- 修改 `work.md`。撤回方式 [Rollback Strategy]：删除本条验证记录。
+
+2026-07-14 09:18 +08:00 --- Issue 003 尚未定义携带 Cookie 查询当前身份 --- 进入第四轮红阶段 [RED]，添加 `GET /auth/me` 在有效 Cookie 下返回当前用户的测试，并为仓储补 `findById` 接缝以便后续实现；未实现 `/auth/me` --- 修改 `apps/api/test/auth-session.test.ts`、`apps/api/src/auth/users.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除 `/auth/me` 测试，回退 `findById` 变更，并删除本条审计记录。
+
+2026-07-14 09:19 +08:00 --- `GET /auth/me` 因路由不存在返回 404 --- 进入绿阶段 [GREEN]，从 Cookie 解析 `access_token` 并按用户 ID 返回当前用户；尚未覆盖未认证与退出 --- 修改 `apps/api/src/app.ts`、`work.md`。撤回方式 [Rollback Strategy]：移除 `/auth/me` 路由并删除本条审计记录。
+
+2026-07-14 09:20 +08:00 --- Issue 003 尚未定义未认证访问当前身份 --- 进入第五轮红阶段 [RED]，添加无 Cookie 访问 `GET /auth/me` 应返回 401 `UNAUTHORIZED` 的测试；未修改实现 --- 修改 `apps/api/test/auth-session.test.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除未认证测试与本条审计记录。
+
+2026-07-14 09:21 +08:00 --- 未认证测试直接通过，因 `/auth/me` 已包含无 Cookie 分支 --- 记录为已覆盖行为，不新增代码 --- 修改 `work.md`。撤回方式 [Rollback Strategy]：删除本条验证记录。
+
+2026-07-14 09:21 +08:00 --- Issue 003 尚未定义退出后会话失效 --- 进入第六轮红阶段 [RED]，添加登录后退出应清除 Cookie 且旧令牌无法再访问 `/auth/me` 的测试；未修改实现 --- 修改 `apps/api/test/auth-session.test.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除退出测试与本条审计记录。
+
+2026-07-14 09:22 +08:00 --- `POST /auth/logout` 因路由不存在返回 404，且原先令牌直接等于用户 ID 无法服务端作废 --- 进入绿阶段 [GREEN]，登录签发独立会话令牌写入内存会话表，`/auth/me` 查会话表，`/auth/logout` 删除会话并清除 Cookie --- 修改 `apps/api/src/app.ts`、`work.md`。撤回方式 [Rollback Strategy]：移除会话表、退出路由，并将登录令牌恢复为用户 ID，删除本条审计记录。
+
+2026-07-14 09:25 +08:00 --- Issue 003 行为测试已通过，但缺少文档、教学 Demo 与验收勾选 --- 同步学习记录、HTML Demo、README 与 Issue 验收，明确采用不透明会话令牌而非 JWT 以满足退出立即失效 --- 修改 `docs/learning/issue-003-session.md`、`docs/learning/README.md`、`docs/demos/session.html`、`docs/issues/003.md`、`README.md`、`work.md`。撤回方式 [Rollback Strategy]：删除新增学习记录与 Demo，恢复 README 与 Issue 003 勾选，并删除本条审计记录。
