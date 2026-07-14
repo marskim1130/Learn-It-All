@@ -63,8 +63,10 @@
     <h1>消息流式回复 Demo</h1>
     <p>
       演示 <code>POST /conversations/:id/messages</code> SSE 与
-      <code>GET /conversations/:id/messages</code> 历史读取。默认使用回显假提供商。
+      <code>GET /conversations/:id/messages</code> 历史读取。默认使用回显假提供商；
+      服务端设置 <code>CHAT_PROVIDER=openai</code> 后可走 OpenAI 兼容真实模型，密钥不进入本页。
     </p>
+
 
     <h2>事件顺序</h2>
     <pre>

@@ -137,3 +137,11 @@
 2026-07-14 10:09 +08:00 --- 历史读取与失败后历史断言因 `GET /conversations/:id/messages` 不存在返回 404 --- 进入绿阶段 [GREEN]，实现消息历史路由；仅返回当前用户会话内消息 --- 修改 `apps/api/src/app.ts`、`work.md`。撤回方式 [Rollback Strategy]：移除历史读取路由并删除本条审计记录。
 
 2026-07-14 10:12 +08:00 --- Issue 006 行为测试已通过，但缺少 messages 表、数据库仓储、中断语义文档与 Demo --- 补充中断失败测试，新增 `messages` 迁移（ON DELETE CASCADE）、数据库消息仓储接入 server，并同步学习记录、HTML Demo、README 与验收勾选 --- 修改 `apps/api/test/messages.test.ts`、`apps/api/src/messages/repository.ts`、`apps/api/src/server.ts`、`packages/database/src/schema.ts`、`packages/database/src/index.ts`、`packages/database/drizzle/0003_messages.sql`、`packages/database/drizzle/meta/_journal.json`、`docs/learning/issue-006-messages-stream.md`、`docs/learning/README.md`、`docs/demos/messages.html`、`docs/issues/006.md`、`README.md`、`work.md`。撤回方式 [Rollback Strategy]：删除本条所列新增文件，恢复被改文件到 Issue 005 完成后的版本，并删除本条审计记录。
+
+2026-07-14 10:15 +08:00 --- Issue 007 缺少可执行的 OpenAI 兼容适配规格 --- 进入测试驱动开发 [TDD] 红阶段 [RED]，添加假 fetch 下兼容提供商应解析上游 SSE 并产出统一 delta 的单个失败测试，未实现提供商 --- 修改 `apps/api/test/openai-provider.test.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除 `apps/api/test/openai-provider.test.ts` 与本条审计记录。
+
+2026-07-14 10:17 +08:00 --- 兼容提供商模块不存在导致测试无法收集，红灯符合预期 --- 进入绿阶段 [GREEN]，实现 `createOpenAICompatibleProvider`：调用 `/chat/completions` 并解析 SSE `data:` 行产出统一 delta；密钥仅出现在 Authorization 头 --- 修改 `apps/api/src/chat/openai-provider.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除 `apps/api/src/chat/openai-provider.ts` 与本条审计记录。
+
+2026-07-14 10:19 +08:00 --- Issue 007 需要上游错误语义、配置选择与 server 注入 --- 补充非 2xx 失败测试与 `resolveChatModelProvider` 行为测试，实现配置解析并将提供商接入 `server.ts`，扩展 `.env.example` --- 修改 `apps/api/test/openai-provider.test.ts`、`apps/api/test/chat-config.test.ts`、`apps/api/src/chat/config.ts`、`apps/api/src/server.ts`、`.env.example`、`work.md`。撤回方式 [Rollback Strategy]：删除 config 模块与新增测试，恢复 server 与 `.env.example`，并删除本条审计记录。
+
+2026-07-14 10:20 +08:00 --- Issue 007 行为测试已通过，但缺少文档与验收勾选 --- 同步学习记录、README 模型配置说明、消息 Demo 提示与 Issue 验收 --- 修改 `docs/learning/issue-007-openai-compatible.md`、`docs/learning/README.md`、`docs/issues/007.md`、`docs/demos/messages.html`、`README.md`、`work.md`。撤回方式 [Rollback Strategy]：删除新增学习记录，恢复 README/Demo/Issue 007 与本条审计记录。

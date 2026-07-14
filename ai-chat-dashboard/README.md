@@ -10,6 +10,7 @@
 - Issue 004：聊天会话创建/列表/详情已完成（按用户隔离，跨用户 404）。
 - Issue 005：会话重命名与删除已完成（owner 隔离，删除 204）。
 - Issue 006：消息发送与模拟 SSE 流已完成（假提供商、状态机、级联删除）。
+- Issue 007：OpenAI 兼容提供商已接入（默认 echo，可切真实兼容 API）。
 
 ## 环境要求
 
@@ -42,6 +43,19 @@ pnpm dev
 - 删除会话：`DELETE http://localhost:3001/conversations/:id`
 - 发送消息（SSE）：`POST http://localhost:3001/conversations/:id/messages`
 - 消息历史：`GET http://localhost:3001/conversations/:id/messages`
+
+### 模型提供商
+
+默认 `CHAT_PROVIDER=echo`（本地回显，CI 安全）。切换 OpenAI 兼容服务时：
+
+```env
+CHAT_PROVIDER=openai
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4o-mini
+```
+
+Ollama 示例：`OPENAI_BASE_URL=http://127.0.0.1:11434/v1`，`OPENAI_API_KEY=ollama`。密钥仅服务端使用，禁止 `NEXT_PUBLIC_*`。
 
 ### 注册与登录示例
 
@@ -102,4 +116,4 @@ pnpm build
 
 ## 下一步
 
-按照 `docs/issues/README.md` 从 Issue 007 连接 OpenAI 兼容模型继续实现。
+按照 `docs/issues/README.md` 从 Issue 008 改善聊天交互与长会话性能继续实现。
