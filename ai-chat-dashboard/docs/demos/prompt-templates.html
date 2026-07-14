@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Prompt 模板 Demo</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: "Segoe UI", system-ui, sans-serif;
+      }
+      body {
+        margin: 0 auto;
+        max-width: 48rem;
+        padding: 1.5rem;
+        line-height: 1.6;
+      }
+      label {
+        display: block;
+        margin-top: 0.75rem;
+      }
+      input,
+      textarea,
+      button {
+        font: inherit;
+        margin-top: 0.25rem;
+      }
+      input,
+      textarea {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 0.5rem 0.75rem;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 1rem;
+      }
+      button {
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+      }
+      pre {
+        overflow: auto;
+        padding: 0.75rem 1rem;
+        border: 1px solid color-mix(in oklab, CanvasText 20%, Canvas);
+        border-radius: 0.5rem;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Prompt 模板 Demo</h1>
+    <p>演示私有模板 CRUD 与 <code>q</code> 筛选。筛选输入可在浏览器侧用 deferred 策略，最终过滤以服务端为准。</p>
+
+    <label>API <input id="base-url" value="http://localhost:3001" /></label>
+    <label>邮箱 <input id="email" value="alice@example.com" /></label>
+    <label>密码 <input id="password" type="password" value="password123" /></label>
+    <label>名称 <input id="name" value="代码审查" /></label>
+    <label>描述 <input id="description" value="审查 PR" /></label>
+    <label>正文 <textarea id="body" rows="3">请审查以下代码并给出建议</textarea></label>
+    <label>标签（逗号分隔） <input id="tags" value="code,review" /></label>
+    <label>筛选 q <input id="q" value="" placeholder="例如：代码" /></label>
+    <label>模板 ID <input id="template-id" placeholder="创建后自动填入" /></label>
+    <div class="actions">
+      <button type="button" id="login-btn">登录</button>
+      <button type="button" id="create-btn">创建</button>
+      <button type="button" id="list-btn">列表/筛选</button>
+      <button type="button" id="update-btn">更新</button>
+      <button type="button" id="delete-btn">删除</button>
+    </div>
+    <pre id="result">等待操作…</pre>
+
+    <script>
+      const result = document.getElementById("result");
+      const baseUrl = () => document.getElementById("base-url").value.replace(/\/$/, "");
+
+      async function call(path, options = {}) {
+        const response = await fetch(`${baseUrl()}${path}`, {
+          credentials: "include",
+          headers: { "content-type": "application/json", ...(options.headers ?? {}) },
+          ...options,
+        });
+        const text = await response.text();
+        result.textContent = `${options.method ?? "GET"} ${path}\nstatus: ${response.status}\n\n${text}`;
+        try {
+          return { response, body: text ? JSON.parse(text) : null };
+        } catch {
+          return { response, body: null };
+        }
+      }
+
+      document.getElementById("login-btn").onclick = () =>
+        call("/auth/login", {
+          method: "POST",
+          body: JSON.stringify({
+            email: document.getElementById("email").value,
+            password: document.getElementById("password").value,
+          }),
+        });
+
+      document.getElementById("create-btn").onclick = async () => {
+        const tags = document
+          .getElementById("tags")
+          .value.split(",")
+          .map((item) => item.trim())
+          .filter(Boolean);
+        const { body } = await call("/prompt-templates", {
+          method: "POST",
+          body: JSON.stringify({
+            name: document.getElementById("name").value,
+            description: document.getElementById("description").value,
+            body: document.getElementById("body").value,
+            tags,
+          }),
+        });
+        if (body?.promptTemplate?.id) {
+          document.getElementById("template-id").value = body.promptTemplate.id;
+        }
+      };
+
+      document.getElementById("list-btn").onclick = () => {
+        const q = document.getElementById("q").value.trim();
+        call(`/prompt-templates${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+      };
+
+      document.getElementById("update-btn").onclick = () => {
+        const id = document.getElementById("template-id").value;
+        if (!id) {
+          result.textContent = "请先填写模板 ID";
+          return;
+        }
+        call(`/prompt-templates/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            name: document.getElementById("name").value,
+            description: document.getElementById("description").value,
+            body: document.getElementById("body").value,
+            tags: document
+              .getElementById("tags")
+              .value.split(",")
+              .map((item) => item.trim())
+              .filter(Boolean),
+          }),
+        });
+      };
+
+      document.getElementById("delete-btn").onclick = async () => {
+        const id = document.getElementById("template-id").value;
+        if (!id) {
+          result.textContent = "请先填写模板 ID";
+          return;
+        }
+        await call(`/prompt-templates/${id}`, { method: "DELETE" });
+        document.getElementById("template-id").value = "";
+      };
+    </script>
+  </body>
+</html>

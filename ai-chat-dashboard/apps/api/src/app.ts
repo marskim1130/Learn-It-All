@@ -19,6 +19,11 @@ import {
   type Message,
   type MessageRepository,
 } from "./messages/repository.js";
+import {
+  createMemoryPromptTemplateRepository,
+  type PromptTemplate,
+  type PromptTemplateRepository,
+} from "./prompt-templates/repository.js";
 
 interface AppDependencies {
   database: {
@@ -27,6 +32,7 @@ interface AppDependencies {
   users?: UserRepository;
   conversations?: ConversationRepository;
   messages?: MessageRepository;
+  promptTemplates?: PromptTemplateRepository;
   chatModel?: ChatModelProvider;
 }
 
@@ -46,6 +52,8 @@ export function buildApp(dependencies?: AppDependencies) {
   const conversations =
     dependencies?.conversations ?? createMemoryConversationRepository();
   const messages = dependencies?.messages ?? createMemoryMessageRepository();
+  const promptTemplates =
+    dependencies?.promptTemplates ?? createMemoryPromptTemplateRepository();
   const chatModel = dependencies?.chatModel ?? createEchoChatModelProvider();
   /** 进程内会话表：access_token -> userId。退出时删除条目使旧令牌失效。 */
   const sessions = new Map<string, string>();
@@ -637,7 +645,254 @@ export function buildApp(dependencies?: AppDependencies) {
       .send(chunks.join(""));
   });
 
+  /**
+   * 创建当前用户的 Prompt 模板。
+   *
+   * @example
+   * const response = await app.inject({
+   *   method: "POST",
+   *   url: "/prompt-templates",
+   *   headers: { cookie: "access_token=<token>" },
+   *   payload: {
+   *     name: "代码审查",
+   *     description: "审查 PR",
+   *     body: "请审查以下代码",
+   *     tags: ["code"],
+   *   },
+   * });
+   */
+  app.post("/prompt-templates", async (request, reply) => {
+    const user = await resolveCurrentUser(request.headers.cookie, sessions, users);
+    if (!user) {
+      return reply.status(401).send({
+        error: {
+          code: "UNAUTHORIZED",
+          message: "未登录或会话已失效",
+        },
+      });
+    }
+
+    const body = request.body as {
+      name?: string;
+      description?: string;
+      body?: string;
+      tags?: string[];
+    };
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    const templateBody = typeof body.body === "string" ? body.body.trim() : "";
+    const description =
+      typeof body.description === "string" ? body.description.trim() : "";
+    const tags = Array.isArray(body.tags)
+      ? body.tags.filter((tag): tag is string => typeof tag === "string").map((tag) => tag.trim()).filter(Boolean)
+      : [];
+
+    if (!name) {
+      return reply.status(400).send({
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "请求参数无效",
+          details: [{ field: "name", message: "名称不能为空" }],
+        },
+      });
+    }
+    if (!templateBody) {
+      return reply.status(400).send({
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "请求参数无效",
+          details: [{ field: "body", message: "正文不能为空" }],
+        },
+      });
+    }
+
+    const template = await promptTemplates.create({
+      ownerId: user.id,
+      name,
+      description,
+      body: templateBody,
+      tags,
+    });
+
+    return reply.status(201).send({
+      promptTemplate: toPublicPromptTemplate(template),
+    });
+  });
+
+  /**
+   * 列出当前用户的 Prompt 模板，支持 q 子串筛选。
+   */
+  app.get("/prompt-templates", async (request, reply) => {
+    const user = await resolveCurrentUser(request.headers.cookie, sessions, users);
+    if (!user) {
+      return reply.status(401).send({
+        error: {
+          code: "UNAUTHORIZED",
+          message: "未登录或会话已失效",
+        },
+      });
+    }
+
+    const query = request.query as { q?: string };
+    const items = await promptTemplates.listByOwner(user.id, query.q ?? "");
+    return {
+      promptTemplates: items.map((item) => toPublicPromptTemplate(item)),
+    };
+  });
+
+  /**
+   * 读取当前用户的单个 Prompt 模板。
+   */
+  app.get("/prompt-templates/:id", async (request, reply) => {
+    const user = await resolveCurrentUser(request.headers.cookie, sessions, users);
+    if (!user) {
+      return reply.status(401).send({
+        error: {
+          code: "UNAUTHORIZED",
+          message: "未登录或会话已失效",
+        },
+      });
+    }
+
+    const { id } = request.params as { id: string };
+    const template = await promptTemplates.findByIdForOwner(id, user.id);
+    if (!template) {
+      return reply.status(404).send({
+        error: {
+          code: "NOT_FOUND",
+          message: "模板不存在",
+        },
+      });
+    }
+
+    return {
+      promptTemplate: toPublicPromptTemplate(template),
+    };
+  });
+
+  /**
+   * 更新当前用户的 Prompt 模板。
+   */
+  app.patch("/prompt-templates/:id", async (request, reply) => {
+    const user = await resolveCurrentUser(request.headers.cookie, sessions, users);
+    if (!user) {
+      return reply.status(401).send({
+        error: {
+          code: "UNAUTHORIZED",
+          message: "未登录或会话已失效",
+        },
+      });
+    }
+
+    const body = request.body as {
+      name?: string;
+      description?: string;
+      body?: string;
+      tags?: string[];
+    };
+
+    const patch: {
+      name?: string;
+      description?: string;
+      body?: string;
+      tags?: string[];
+    } = {};
+
+    if (body.name !== undefined) {
+      const name = typeof body.name === "string" ? body.name.trim() : "";
+      if (!name) {
+        return reply.status(400).send({
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "请求参数无效",
+            details: [{ field: "name", message: "名称不能为空" }],
+          },
+        });
+      }
+      patch.name = name;
+    }
+    if (body.body !== undefined) {
+      const templateBody = typeof body.body === "string" ? body.body.trim() : "";
+      if (!templateBody) {
+        return reply.status(400).send({
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "请求参数无效",
+            details: [{ field: "body", message: "正文不能为空" }],
+          },
+        });
+      }
+      patch.body = templateBody;
+    }
+    if (body.description !== undefined) {
+      patch.description =
+        typeof body.description === "string" ? body.description.trim() : "";
+    }
+    if (body.tags !== undefined) {
+      patch.tags = Array.isArray(body.tags)
+        ? body.tags
+            .filter((tag): tag is string => typeof tag === "string")
+            .map((tag) => tag.trim())
+            .filter(Boolean)
+        : [];
+    }
+
+    const { id } = request.params as { id: string };
+    const template = await promptTemplates.updateForOwner(id, user.id, patch);
+    if (!template) {
+      return reply.status(404).send({
+        error: {
+          code: "NOT_FOUND",
+          message: "模板不存在",
+        },
+      });
+    }
+
+    return {
+      promptTemplate: toPublicPromptTemplate(template),
+    };
+  });
+
+  /**
+   * 删除当前用户的 Prompt 模板。
+   */
+  app.delete("/prompt-templates/:id", async (request, reply) => {
+    const user = await resolveCurrentUser(request.headers.cookie, sessions, users);
+    if (!user) {
+      return reply.status(401).send({
+        error: {
+          code: "UNAUTHORIZED",
+          message: "未登录或会话已失效",
+        },
+      });
+    }
+
+    const { id } = request.params as { id: string };
+    const deleted = await promptTemplates.deleteForOwner(id, user.id);
+    if (!deleted) {
+      return reply.status(404).send({
+        error: {
+          code: "NOT_FOUND",
+          message: "模板不存在",
+        },
+      });
+    }
+
+    return reply.status(204).send();
+  });
+
   return app;
+}
+
+function toPublicPromptTemplate(template: PromptTemplate) {
+  return {
+    id: template.id,
+    name: template.name,
+    description: template.description,
+    body: template.body,
+    tags: template.tags,
+    createdAt: template.createdAt.toISOString(),
+    updatedAt: template.updatedAt.toISOString(),
+  };
 }
 
 function toPublicMessage(message: Message) {

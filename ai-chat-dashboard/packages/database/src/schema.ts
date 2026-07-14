@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 /**
  * 用户表：保存注册账户的公开标识与密码摘要。
@@ -46,8 +46,25 @@ export const messages = pgTable("messages", {
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });
 
+/**
+ * Prompt 模板表：归属单个用户，列表筛选始终约束 owner_id。
+ */
+export const promptTemplates = pgTable("prompt_templates", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  ownerId: uuid("owner_id")
+    .notNull()
+    .references(() => users.id),
+  name: text("name").notNull(),
+  description: text("description").notNull().default(""),
+  body: text("body").notNull(),
+  tags: jsonb("tags").$type<string[]>().notNull().default([]),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+});
+
 export const schema = {
   users,
   conversations,
   messages,
+  promptTemplates,
 };

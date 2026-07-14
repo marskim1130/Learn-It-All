@@ -12,6 +12,7 @@
 - Issue 006：消息发送与模拟 SSE 流已完成（假提供商、状态机、级联删除）。
 - Issue 007：OpenAI 兼容提供商已接入（默认 echo，可切真实兼容 API）。
 - Issue 008：聊天性能实验台已完成（批量流式、TanStack 虚拟列表、切换 pending）。
+- Issue 009：Prompt 模板 CRUD 与筛选已完成（私有隔离、tags、q 搜索）。
 
 ## 环境要求
 
@@ -45,6 +46,7 @@ pnpm dev
 - 删除会话：`DELETE http://localhost:3001/conversations/:id`
 - 发送消息（SSE）：`POST http://localhost:3001/conversations/:id/messages`
 - 消息历史：`GET http://localhost:3001/conversations/:id/messages`
+- Prompt 模板：`/prompt-templates`（POST/GET/PATCH/DELETE，支持 `?q=`）
 
 ### 模型提供商
 
@@ -118,4 +120,4 @@ pnpm build
 
 ## 下一步
 
-按照 `docs/issues/README.md` 从 Issue 009 管理基础 Prompt 模板继续实现。
+按照 `docs/issues/README.md` 从 Issue 010 使用带变量的 Prompt 模板继续实现。
