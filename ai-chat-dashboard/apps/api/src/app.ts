@@ -355,6 +355,101 @@ export function buildApp(dependencies?: AppDependencies) {
     };
   });
 
+  /**
+   * 重命名当前用户拥有的会话。
+   *
+   * @example
+   * const response = await app.inject({
+   *   method: "PATCH",
+   *   url: "/conversations/<id>",
+   *   headers: { cookie: "access_token=<token>" },
+   *   payload: { title: "新标题" },
+   * });
+   */
+  app.patch("/conversations/:id", async (request, reply) => {
+    const user = await resolveCurrentUser(request.headers.cookie, sessions, users);
+    if (!user) {
+      return reply.status(401).send({
+        error: {
+          code: "UNAUTHORIZED",
+          message: "未登录或会话已失效",
+        },
+      });
+    }
+
+    const body = request.body as { title?: string };
+    const title = typeof body.title === "string" ? body.title.trim() : "";
+    if (!title) {
+      return reply.status(400).send({
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "请求参数无效",
+          details: [
+            {
+              field: "title",
+              message: "标题不能为空",
+            },
+          ],
+        },
+      });
+    }
+
+    const { id } = request.params as { id: string };
+    const conversation = await conversations.renameForOwner(id, user.id, title);
+    if (!conversation) {
+      return reply.status(404).send({
+        error: {
+          code: "NOT_FOUND",
+          message: "会话不存在",
+        },
+      });
+    }
+
+    return {
+      conversation: {
+        id: conversation.id,
+        title: conversation.title,
+        createdAt: conversation.createdAt.toISOString(),
+        updatedAt: conversation.updatedAt.toISOString(),
+      },
+    };
+  });
+
+  /**
+   * 删除当前用户拥有的会话。
+   *
+   * @example
+   * await app.inject({
+   *   method: "DELETE",
+   *   url: "/conversations/<id>",
+   *   headers: { cookie: "access_token=<token>" },
+   * });
+   */
+  app.delete("/conversations/:id", async (request, reply) => {
+    const user = await resolveCurrentUser(request.headers.cookie, sessions, users);
+    if (!user) {
+      return reply.status(401).send({
+        error: {
+          code: "UNAUTHORIZED",
+          message: "未登录或会话已失效",
+        },
+      });
+    }
+
+    const { id } = request.params as { id: string };
+    const deleted = await conversations.deleteForOwner(id, user.id);
+    if (!deleted) {
+      return reply.status(404).send({
+        error: {
+          code: "NOT_FOUND",
+          message: "会话不存在",
+        },
+      });
+    }
+
+    return reply.status(204).send();
+  });
+
   return app;
 }
 

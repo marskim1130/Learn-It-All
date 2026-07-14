@@ -6,6 +6,7 @@
 - [Issue 002：用户注册](issue-002-register.md)
 - [Issue 003：登录与身份会话](issue-003-session.md)
 - [Issue 004：创建并查看聊天会话](issue-004-conversations.md)
+- [Issue 005：管理已有聊天会话](issue-005-manage-conversations.md)
 
 - TypeScript：泛型 [Generics]、类型推导 [Type Inference]、工具类型 [Utility Types]。
 - React：状态所有权 [State Ownership]、并发渲染 [Concurrent Rendering]、性能测量和虚拟化 [Virtualization]。

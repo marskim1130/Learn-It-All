@@ -8,6 +8,7 @@
 - Issue 002：用户注册 API 已完成（Argon2 密码摘要、邮箱唯一约束、稳定错误码）。
 - Issue 003：登录与身份会话已完成（HttpOnly Cookie、当前用户、退出失效）。
 - Issue 004：聊天会话创建/列表/详情已完成（按用户隔离，跨用户 404）。
+- Issue 005：会话重命名与删除已完成（owner 隔离，删除 204）。
 
 ## 环境要求
 
@@ -36,6 +37,8 @@ pnpm dev
 - 会话列表：`GET http://localhost:3001/conversations`
 - 创建会话：`POST http://localhost:3001/conversations`
 - 会话详情：`GET http://localhost:3001/conversations/:id`
+- 重命名会话：`PATCH http://localhost:3001/conversations/:id`
+- 删除会话：`DELETE http://localhost:3001/conversations/:id`
 
 ### 注册与登录示例
 
@@ -60,10 +63,20 @@ Invoke-RestMethod -Uri http://localhost:3001/conversations -WebSession $session
 Invoke-RestMethod -Uri "http://localhost:3001/conversations/$($created.conversation.id)" `
   -WebSession $session
 
+Invoke-RestMethod -Method Patch `
+  -Uri "http://localhost:3001/conversations/$($created.conversation.id)" `
+  -ContentType "application/json" `
+  -Body '{"title":"更新后的标题"}' `
+  -WebSession $session
+
+Invoke-WebRequest -Method Delete `
+  -Uri "http://localhost:3001/conversations/$($created.conversation.id)" `
+  -WebSession $session
+
 Invoke-WebRequest -Method Post -Uri http://localhost:3001/auth/logout -WebSession $session
 ```
 
-注册成功返回 `201`；登录成功返回 `200` 并设置 `HttpOnly` Cookie；错误凭据返回 `401 INVALID_CREDENTIALS`；未认证访问 `/auth/me` 返回 `401 UNAUTHORIZED`。创建会话返回 `201`；列表与详情只包含当前用户数据；跨用户详情返回 `404 NOT_FOUND`。
+注册成功返回 `201`；登录成功返回 `200` 并设置 `HttpOnly` Cookie；错误凭据返回 `401 INVALID_CREDENTIALS`；未认证访问 `/auth/me` 返回 `401 UNAUTHORIZED`。创建会话返回 `201`；列表与详情只包含当前用户数据；跨用户详情返回 `404 NOT_FOUND`。重命名返回 `200` 且详情立即可见；删除返回 `204`，列表与详情不再包含该会话。
 
 若未安装 Docker，可以运行不依赖真实 PostgreSQL 的测试，但数据库集成测试会被跳过。
 
@@ -86,4 +99,4 @@ pnpm build
 
 ## 下一步
 
-按照 `docs/issues/README.md` 从 Issue 005 管理已有聊天会话继续实现。
+按照 `docs/issues/README.md` 从 Issue 006 发送消息并接收模拟流式回复继续实现。

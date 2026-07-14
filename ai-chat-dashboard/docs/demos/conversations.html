@@ -73,13 +73,21 @@ GET /conversations
 → 200 { conversations: [...] }  // 仅当前用户
 
 GET /conversations/:id
-→ 200 自己的会话 / 404 NOT_FOUND（他人或不存在）</pre>
+→ 200 自己的会话 / 404 NOT_FOUND（他人或不存在）
+
+PATCH /conversations/:id
+{ "title": "新标题" }
+→ 200 更新后的会话；空标题 400；他人 404
+
+DELETE /conversations/:id
+→ 204；列表与详情不再可见；他人 404</pre>
 
     <h2>设计思想</h2>
     <ul>
       <li>所有查询绑定 <code>owner_id</code>，授权在服务端完成。</li>
       <li>跨用户与不存在统一 404，避免资源枚举。</li>
       <li>仓储接缝便于内存测试与 PostgreSQL 实现切换。</li>
+      <li>未来 messages 表应对 conversation_id 使用 ON DELETE CASCADE。</li>
     </ul>
 
     <h2>可运行 Demo</h2>
@@ -110,6 +118,8 @@ GET /conversations/:id
         <button type="button" id="create-btn">创建会话</button>
         <button type="button" id="list-btn">列出会话</button>
         <button type="button" id="detail-btn">查看详情</button>
+        <button type="button" id="rename-btn">重命名</button>
+        <button type="button" id="delete-btn">删除</button>
       </div>
     </form>
     <pre id="result">等待操作…</pre>
@@ -119,6 +129,7 @@ GET /conversations/:id
       <li>未登录就创建，应得到 401。</li>
       <li>用别人的会话 ID 访问详情，应得到 404 而不是 403。</li>
       <li>前端按 owner 过滤列表，却不在 API 侧约束。</li>
+      <li>空标题重命名应得到 400 VALIDATION_ERROR。</li>
     </ul>
 
     <script>
@@ -182,6 +193,26 @@ GET /conversations/:id
           return;
         }
         call(`/conversations/${idInput.value}`);
+      });
+
+      document.getElementById("rename-btn").addEventListener("click", () => {
+        if (!idInput.value) {
+          result.textContent = "请先填写会话 ID，或先创建会话。";
+          return;
+        }
+        call(`/conversations/${idInput.value}`, {
+          method: "PATCH",
+          body: JSON.stringify({ title: titleInput.value }),
+        });
+      });
+
+      document.getElementById("delete-btn").addEventListener("click", async () => {
+        if (!idInput.value) {
+          result.textContent = "请先填写会话 ID，或先创建会话。";
+          return;
+        }
+        await call(`/conversations/${idInput.value}`, { method: "DELETE" });
+        idInput.value = "";
       });
     </script>
   </body>

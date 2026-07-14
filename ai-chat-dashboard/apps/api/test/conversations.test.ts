@@ -233,3 +233,205 @@ describe("GET /conversations/:id", () => {
     await app.close();
   });
 });
+
+describe("PATCH /conversations/:id", () => {
+  it("登录用户可重命名自己的会话且新标题立即可见", async () => {
+    const conversations = createMemoryConversationRepository([
+      {
+        id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        ownerId: ALICE_ID,
+        title: "旧标题",
+        createdAt: new Date("2026-07-13T01:00:00.000Z"),
+        updatedAt: new Date("2026-07-13T01:00:00.000Z"),
+      },
+    ]);
+
+    const { app, loginAsAlice } = await createAuthedApp({ conversations });
+    const cookie = await loginAsAlice();
+
+    const response = await app.inject({
+      method: "PATCH",
+      url: "/conversations/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      headers: { cookie },
+      payload: {
+        title: "新标题",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      conversation: {
+        id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        title: "新标题",
+        createdAt: "2026-07-13T01:00:00.000Z",
+        updatedAt: expect.any(String),
+      },
+    });
+    expect(response.json().conversation.updatedAt).not.toBe(
+      "2026-07-13T01:00:00.000Z",
+    );
+
+    const detail = await app.inject({
+      method: "GET",
+      url: "/conversations/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      headers: { cookie },
+    });
+    expect(detail.statusCode).toBe(200);
+    expect(detail.json().conversation.title).toBe("新标题");
+
+    await app.close();
+  });
+
+  it("空标题重命名返回 400 VALIDATION_ERROR", async () => {
+    const conversations = createMemoryConversationRepository([
+      {
+        id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        ownerId: ALICE_ID,
+        title: "旧标题",
+        createdAt: new Date("2026-07-13T01:00:00.000Z"),
+        updatedAt: new Date("2026-07-13T01:00:00.000Z"),
+      },
+    ]);
+
+    const { app, loginAsAlice } = await createAuthedApp({ conversations });
+    const cookie = await loginAsAlice();
+
+    const response = await app.inject({
+      method: "PATCH",
+      url: "/conversations/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      headers: { cookie },
+      payload: {
+        title: "   ",
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({
+      error: {
+        code: "VALIDATION_ERROR",
+        message: expect.any(String),
+        details: [
+          {
+            field: "title",
+            message: expect.any(String),
+          },
+        ],
+      },
+    });
+
+    await app.close();
+  });
+
+  it("重命名他人会话返回 404 NOT_FOUND", async () => {
+    const conversations = createMemoryConversationRepository([
+      {
+        id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+        ownerId: BOB_ID,
+        title: "Bob 的会话",
+        createdAt: new Date("2026-07-13T02:00:00.000Z"),
+        updatedAt: new Date("2026-07-13T02:00:00.000Z"),
+      },
+    ]);
+
+    const { app, loginAsAlice } = await createAuthedApp({
+      conversations,
+      includeBob: true,
+    });
+    const cookie = await loginAsAlice();
+
+    const response = await app.inject({
+      method: "PATCH",
+      url: "/conversations/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+      headers: { cookie },
+      payload: {
+        title: "劫持标题",
+      },
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toEqual({
+      error: {
+        code: "NOT_FOUND",
+        message: expect.any(String),
+      },
+    });
+
+    await app.close();
+  });
+});
+
+describe("DELETE /conversations/:id", () => {
+  it("登录用户可删除自己的会话且列表与详情不再可见", async () => {
+    const conversations = createMemoryConversationRepository([
+      {
+        id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        ownerId: ALICE_ID,
+        title: "待删除",
+        createdAt: new Date("2026-07-13T01:00:00.000Z"),
+        updatedAt: new Date("2026-07-13T01:00:00.000Z"),
+      },
+    ]);
+
+    const { app, loginAsAlice } = await createAuthedApp({ conversations });
+    const cookie = await loginAsAlice();
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/conversations/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      headers: { cookie },
+    });
+
+    expect(response.statusCode).toBe(204);
+
+    const list = await app.inject({
+      method: "GET",
+      url: "/conversations",
+      headers: { cookie },
+    });
+    expect(list.statusCode).toBe(200);
+    expect(list.json()).toEqual({ conversations: [] });
+
+    const detail = await app.inject({
+      method: "GET",
+      url: "/conversations/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      headers: { cookie },
+    });
+    expect(detail.statusCode).toBe(404);
+
+    await app.close();
+  });
+
+  it("删除他人会话返回 404 NOT_FOUND", async () => {
+    const conversations = createMemoryConversationRepository([
+      {
+        id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+        ownerId: BOB_ID,
+        title: "Bob 的会话",
+        createdAt: new Date("2026-07-13T02:00:00.000Z"),
+        updatedAt: new Date("2026-07-13T02:00:00.000Z"),
+      },
+    ]);
+
+    const { app, loginAsAlice } = await createAuthedApp({
+      conversations,
+      includeBob: true,
+    });
+    const cookie = await loginAsAlice();
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/conversations/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+      headers: { cookie },
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toEqual({
+      error: {
+        code: "NOT_FOUND",
+        message: expect.any(String),
+      },
+    });
+
+    await app.close();
+  });
+});

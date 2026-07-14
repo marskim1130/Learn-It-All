@@ -119,3 +119,11 @@
 2026-07-14 09:54 +08:00 --- 跨用户读取测试直接通过，因详情查询绑定 `ownerId` --- 记录为已覆盖行为，不新增代码 --- 修改 `work.md`。撤回方式 [Rollback Strategy]：删除本条验证记录。
 
 2026-07-14 09:55 +08:00 --- Issue 004 行为测试已通过，但缺少 PostgreSQL 表、数据库仓储与文档 --- 进入重构与交付：新增 `conversations` 迁移与 schema、数据库仓储接入 `server.ts`，同步学习记录、Demo、README 与验收勾选；顺带让 `/auth/me` 复用 `resolveCurrentUser` --- 修改 `packages/database/src/schema.ts`、`packages/database/src/index.ts`、`packages/database/drizzle/0002_conversations.sql`、`packages/database/drizzle/meta/_journal.json`、`apps/api/src/conversations/repository.ts`、`apps/api/src/server.ts`、`apps/api/src/app.ts`、`apps/api/test/conversations.test.ts`、`docs/learning/issue-004-conversations.md`、`docs/learning/README.md`、`docs/demos/conversations.html`、`docs/issues/004.md`、`README.md`、`work.md`。撤回方式 [Rollback Strategy]：删除本条所列新增文件，恢复被改文件到 Issue 003 完成后的版本，并删除本条审计记录。
+
+2026-07-14 09:57 +08:00 --- Issue 005 缺少可执行的首个重命名行为规格 --- 进入测试驱动开发 [TDD] 红阶段 [RED]，添加登录用户 `PATCH /conversations/:id` 应更新标题且详情立即可见的单个失败测试，未实现 API --- 修改 `apps/api/test/conversations.test.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除重命名测试与本条审计记录。
+
+2026-07-14 09:58 +08:00 --- `PATCH /conversations/:id` 因路由不存在返回 404，红灯符合预期 --- 进入绿阶段 [GREEN]，为仓储增加 `renameForOwner`/`deleteForOwner`，并实现重命名与删除路由；空标题校验与跨用户隔离一并落地，供后续测试驱动 --- 修改 `apps/api/src/conversations/repository.ts`、`apps/api/src/app.ts`、`work.md`。撤回方式 [Rollback Strategy]：移除 rename/delete 仓储方法与路由，并删除本条审计记录。
+
+2026-07-14 09:59 +08:00 --- Issue 005 其余行为（空标题、跨用户重命名、删除、跨用户删除）在示踪弹绿实现中已具备 --- 补充对应行为测试锁定契约，不新增实现代码 --- 修改 `apps/api/test/conversations.test.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除新增的重命名/删除补充测试与本条审计记录。
+
+2026-07-14 10:01 +08:00 --- Issue 005 行为测试已通过，但缺少文档、Demo 与验收勾选 --- 同步学习记录、会话 Demo 的重命名/删除操作、README、Issue 验收，并在 schema 注释中冻结 messages 级联删除约定 --- 修改 `docs/learning/issue-005-manage-conversations.md`、`docs/learning/README.md`、`docs/demos/conversations.html`、`docs/issues/005.md`、`packages/database/src/schema.ts`、`README.md`、`work.md`。撤回方式 [Rollback Strategy]：删除新增学习记录，恢复 Demo/README/Issue 005/schema 与本条审计记录。

@@ -24,6 +24,12 @@ export interface ConversationRepository {
   create(input: CreateConversationInput): Promise<Conversation>;
   listByOwner(ownerId: string): Promise<Conversation[]>;
   findByIdForOwner(id: string, ownerId: string): Promise<Conversation | null>;
+  renameForOwner(
+    id: string,
+    ownerId: string,
+    title: string,
+  ): Promise<Conversation | null>;
+  deleteForOwner(id: string, ownerId: string): Promise<boolean>;
 }
 
 /**
@@ -62,6 +68,27 @@ export function createMemoryConversationRepository(
         return null;
       }
       return conversation;
+    },
+    async renameForOwner(id, ownerId, title) {
+      const conversation = records.get(id);
+      if (!conversation || conversation.ownerId !== ownerId) {
+        return null;
+      }
+
+      const updated: Conversation = {
+        ...conversation,
+        title,
+        updatedAt: new Date(),
+      };
+      records.set(id, updated);
+      return updated;
+    },
+    async deleteForOwner(id, ownerId) {
+      const conversation = records.get(id);
+      if (!conversation || conversation.ownerId !== ownerId) {
+        return false;
+      }
+      return records.delete(id);
     },
   };
 }
@@ -121,6 +148,32 @@ export function createDatabaseConversationRepository(
         .limit(1);
 
       return conversation ?? null;
+    },
+    async renameForOwner(id, ownerId, title) {
+      const [conversation] = await database.client
+        .update(conversations)
+        .set({
+          title,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(conversations.id, id), eq(conversations.ownerId, ownerId)))
+        .returning({
+          id: conversations.id,
+          ownerId: conversations.ownerId,
+          title: conversations.title,
+          createdAt: conversations.createdAt,
+          updatedAt: conversations.updatedAt,
+        });
+
+      return conversation ?? null;
+    },
+    async deleteForOwner(id, ownerId) {
+      const deleted = await database.client
+        .delete(conversations)
+        .where(and(eq(conversations.id, id), eq(conversations.ownerId, ownerId)))
+        .returning({ id: conversations.id });
+
+      return deleted.length > 0;
     },
   };
 }

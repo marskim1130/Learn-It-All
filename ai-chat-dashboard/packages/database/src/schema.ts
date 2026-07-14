@@ -17,6 +17,7 @@ export const users = pgTable("users", {
 
 /**
  * 聊天会话表：归属单个用户，列表与详情查询始终约束 owner_id。
+ * 未来 messages 表的 conversation_id 必须 REFERENCES 本表并 ON DELETE CASCADE。
  *
  * @example
  * import { conversations } from "@ai-chat-dashboard/database";
