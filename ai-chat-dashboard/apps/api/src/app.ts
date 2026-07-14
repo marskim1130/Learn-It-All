@@ -10,6 +10,15 @@ import {
   createMemoryConversationRepository,
   type ConversationRepository,
 } from "./conversations/repository.js";
+import {
+  createEchoChatModelProvider,
+  type ChatModelProvider,
+} from "./chat/provider.js";
+import {
+  createMemoryMessageRepository,
+  type Message,
+  type MessageRepository,
+} from "./messages/repository.js";
 
 interface AppDependencies {
   database: {
@@ -17,6 +26,8 @@ interface AppDependencies {
   };
   users?: UserRepository;
   conversations?: ConversationRepository;
+  messages?: MessageRepository;
+  chatModel?: ChatModelProvider;
 }
 
 /**
@@ -34,6 +45,8 @@ export function buildApp(dependencies?: AppDependencies) {
   const users = dependencies?.users ?? createMemoryUserRepository();
   const conversations =
     dependencies?.conversations ?? createMemoryConversationRepository();
+  const messages = dependencies?.messages ?? createMemoryMessageRepository();
+  const chatModel = dependencies?.chatModel ?? createEchoChatModelProvider();
   /** 进程内会话表：access_token -> userId。退出时删除条目使旧令牌失效。 */
   const sessions = new Map<string, string>();
 
@@ -450,7 +463,195 @@ export function buildApp(dependencies?: AppDependencies) {
     return reply.status(204).send();
   });
 
+  /**
+   * 读取当前用户会话内的消息历史。
+   *
+   * @example
+   * const response = await app.inject({
+   *   method: "GET",
+   *   url: "/conversations/<id>/messages",
+   *   headers: { cookie: "access_token=<token>" },
+   * });
+   */
+  app.get("/conversations/:id/messages", async (request, reply) => {
+    const user = await resolveCurrentUser(request.headers.cookie, sessions, users);
+    if (!user) {
+      return reply.status(401).send({
+        error: {
+          code: "UNAUTHORIZED",
+          message: "未登录或会话已失效",
+        },
+      });
+    }
+
+    const { id: conversationId } = request.params as { id: string };
+    const conversation = await conversations.findByIdForOwner(
+      conversationId,
+      user.id,
+    );
+    if (!conversation) {
+      return reply.status(404).send({
+        error: {
+          code: "NOT_FOUND",
+          message: "会话不存在",
+        },
+      });
+    }
+
+    const items = await messages.listByConversation(conversationId);
+    return {
+      messages: items.map((item) => toPublicMessage(item)),
+    };
+  });
+
+  /**
+   * 发送用户消息，并通过 SSE 流式返回助手回复。
+   *
+   * @example
+   * const response = await app.inject({
+   *   method: "POST",
+   *   url: "/conversations/<id>/messages",
+   *   headers: { cookie: "access_token=<token>" },
+   *   payload: { content: "你好" },
+   * });
+   * // text/event-stream: message.user → started → delta* → completed
+   */
+  app.post("/conversations/:id/messages", async (request, reply) => {
+    const user = await resolveCurrentUser(request.headers.cookie, sessions, users);
+    if (!user) {
+      return reply.status(401).send({
+        error: {
+          code: "UNAUTHORIZED",
+          message: "未登录或会话已失效",
+        },
+      });
+    }
+
+    const body = request.body as { content?: string };
+    const content = typeof body.content === "string" ? body.content.trim() : "";
+    if (!content) {
+      return reply.status(400).send({
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "请求参数无效",
+          details: [
+            {
+              field: "content",
+              message: "消息内容不能为空",
+            },
+          ],
+        },
+      });
+    }
+
+    const { id: conversationId } = request.params as { id: string };
+    const conversation = await conversations.findByIdForOwner(
+      conversationId,
+      user.id,
+    );
+    if (!conversation) {
+      return reply.status(404).send({
+        error: {
+          code: "NOT_FOUND",
+          message: "会话不存在",
+        },
+      });
+    }
+
+    const userMessage = await messages.create({
+      conversationId,
+      role: "user",
+      content,
+      status: "completed",
+    });
+
+    const assistantMessage = await messages.create({
+      conversationId,
+      role: "assistant",
+      content: "",
+      status: "generating",
+    });
+
+    const history = await messages.listByConversation(conversationId);
+    const chunks: string[] = [];
+    chunks.push(formatSseEvent("message.user", toPublicMessage(userMessage)));
+    chunks.push(
+      formatSseEvent("message.assistant.started", toPublicMessage(assistantMessage)),
+    );
+
+    let assistantContent = "";
+    try {
+      for await (const chunk of chatModel.stream({
+        messages: history
+          .filter((item) => item.status === "completed" || item.id === userMessage.id)
+          .map((item) => ({
+            role: item.role,
+            content: item.content,
+          })),
+      })) {
+        assistantContent += chunk.delta;
+        chunks.push(
+          formatSseEvent("message.assistant.delta", {
+            id: assistantMessage.id,
+            delta: chunk.delta,
+          }),
+        );
+      }
+
+      const completed =
+        (await messages.update(assistantMessage.id, {
+          content: assistantContent,
+          status: "completed",
+        })) ?? {
+          ...assistantMessage,
+          content: assistantContent,
+          status: "completed" as const,
+        };
+
+      chunks.push(
+        formatSseEvent("message.assistant.completed", toPublicMessage(completed)),
+      );
+    } catch {
+      const failed =
+        (await messages.update(assistantMessage.id, {
+          content: assistantContent,
+          status: "failed",
+        })) ?? {
+          ...assistantMessage,
+          content: assistantContent,
+          status: "failed" as const,
+        };
+
+      chunks.push(
+        formatSseEvent("message.assistant.failed", {
+          ...toPublicMessage(failed),
+          message: "模型生成失败",
+        }),
+      );
+    }
+
+    return reply
+      .status(200)
+      .header("content-type", "text/event-stream; charset=utf-8")
+      .header("cache-control", "no-cache")
+      .send(chunks.join(""));
+  });
+
   return app;
+}
+
+function toPublicMessage(message: Message) {
+  return {
+    id: message.id,
+    role: message.role,
+    content: message.content,
+    status: message.status,
+    createdAt: message.createdAt.toISOString(),
+  };
+}
+
+function formatSseEvent(event: string, data: unknown): string {
+  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 }
 
 async function resolveCurrentUser(

@@ -127,3 +127,13 @@
 2026-07-14 09:59 +08:00 --- Issue 005 其余行为（空标题、跨用户重命名、删除、跨用户删除）在示踪弹绿实现中已具备 --- 补充对应行为测试锁定契约，不新增实现代码 --- 修改 `apps/api/test/conversations.test.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除新增的重命名/删除补充测试与本条审计记录。
 
 2026-07-14 10:01 +08:00 --- Issue 005 行为测试已通过，但缺少文档、Demo 与验收勾选 --- 同步学习记录、会话 Demo 的重命名/删除操作、README、Issue 验收，并在 schema 注释中冻结 messages 级联删除约定 --- 修改 `docs/learning/issue-005-manage-conversations.md`、`docs/learning/README.md`、`docs/demos/conversations.html`、`docs/issues/005.md`、`packages/database/src/schema.ts`、`README.md`、`work.md`。撤回方式 [Rollback Strategy]：删除新增学习记录，恢复 Demo/README/Issue 005/schema 与本条审计记录。
+
+2026-07-14 10:05 +08:00 --- Issue 006 缺少可执行的首个消息流式规格 --- 进入测试驱动开发 [TDD] 红阶段 [RED]，添加 `POST /conversations/:id/messages` 应先持久化用户消息并按序返回 SSE 事件的单个失败测试，未实现 API --- 修改 `apps/api/test/messages.test.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除 `apps/api/test/messages.test.ts` 与本条审计记录。
+
+2026-07-14 10:07 +08:00 --- `POST /conversations/:id/messages` 因路由不存在返回 404 --- 进入绿阶段 [GREEN]，添加消息仓储、回显假提供商与 SSE 发送路由，先持久化用户消息再输出 started/delta/completed；尚未覆盖历史读取、校验失败与中断 --- 修改 `apps/api/src/messages/repository.ts`、`apps/api/src/chat/provider.ts`、`apps/api/src/app.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除消息与提供商模块，移除发送路由并删除本条审计记录。
+
+2026-07-14 10:08 +08:00 --- Issue 006 尚未覆盖历史读取、空内容、跨用户与模型失败路径 --- 进入后续红阶段 [RED]，补充对应行为测试；未新增实现 --- 修改 `apps/api/test/messages.test.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除新增消息测试用例与本条审计记录。
+
+2026-07-14 10:09 +08:00 --- 历史读取与失败后历史断言因 `GET /conversations/:id/messages` 不存在返回 404 --- 进入绿阶段 [GREEN]，实现消息历史路由；仅返回当前用户会话内消息 --- 修改 `apps/api/src/app.ts`、`work.md`。撤回方式 [Rollback Strategy]：移除历史读取路由并删除本条审计记录。
+
+2026-07-14 10:12 +08:00 --- Issue 006 行为测试已通过，但缺少 messages 表、数据库仓储、中断语义文档与 Demo --- 补充中断失败测试，新增 `messages` 迁移（ON DELETE CASCADE）、数据库消息仓储接入 server，并同步学习记录、HTML Demo、README 与验收勾选 --- 修改 `apps/api/test/messages.test.ts`、`apps/api/src/messages/repository.ts`、`apps/api/src/server.ts`、`packages/database/src/schema.ts`、`packages/database/src/index.ts`、`packages/database/drizzle/0003_messages.sql`、`packages/database/drizzle/meta/_journal.json`、`docs/learning/issue-006-messages-stream.md`、`docs/learning/README.md`、`docs/demos/messages.html`、`docs/issues/006.md`、`README.md`、`work.md`。撤回方式 [Rollback Strategy]：删除本条所列新增文件，恢复被改文件到 Issue 005 完成后的版本，并删除本条审计记录。

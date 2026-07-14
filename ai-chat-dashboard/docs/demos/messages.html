@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>消息流式回复 Demo</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: "Segoe UI", system-ui, sans-serif;
+      }
+      body {
+        margin: 0 auto;
+        max-width: 48rem;
+        padding: 1.5rem;
+        line-height: 1.6;
+      }
+      code,
+      pre {
+        font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      }
+      pre {
+        overflow: auto;
+        padding: 0.75rem 1rem;
+        border: 1px solid color-mix(in oklab, CanvasText 20%, Canvas);
+        border-radius: 0.5rem;
+      }
+      label {
+        display: block;
+        margin-top: 0.75rem;
+      }
+      input,
+      button,
+      textarea {
+        font: inherit;
+        margin-top: 0.25rem;
+      }
+      input,
+      textarea {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 0.5rem 0.75rem;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 1rem;
+      }
+      button {
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+      }
+      #stream,
+      #history {
+        margin-top: 1rem;
+        white-space: pre-wrap;
+        min-height: 4rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>消息流式回复 Demo</h1>
+    <p>
+      演示 <code>POST /conversations/:id/messages</code> SSE 与
+      <code>GET /conversations/:id/messages</code> 历史读取。默认使用回显假提供商。
+    </p>
+
+    <h2>事件顺序</h2>
+    <pre>
+message.user
+message.assistant.started
+message.assistant.delta*
+message.assistant.completed | failed</pre>
+
+    <label>
+      API 地址
+      <input id="base-url" value="http://localhost:3001" />
+    </label>
+    <label>
+      邮箱
+      <input id="email" type="email" value="alice@example.com" />
+    </label>
+    <label>
+      密码
+      <input id="password" type="password" value="password123" />
+    </label>
+    <label>
+      会话 ID
+      <input id="conversation-id" placeholder="先登录并创建会话" />
+    </label>
+    <label>
+      消息内容
+      <textarea id="content" rows="3">你好</textarea>
+    </label>
+    <div class="actions">
+      <button type="button" id="login-btn">登录</button>
+      <button type="button" id="create-btn">创建会话</button>
+      <button type="button" id="send-btn">发送并流式接收</button>
+      <button type="button" id="history-btn">读取历史</button>
+    </div>
+    <h2>SSE 原始输出</h2>
+    <pre id="stream">等待发送…</pre>
+    <h2>历史消息</h2>
+    <pre id="history">等待读取…</pre>
+
+    <script>
+      const baseUrlInput = document.getElementById("base-url");
+      const emailInput = document.getElementById("email");
+      const passwordInput = document.getElementById("password");
+      const conversationInput = document.getElementById("conversation-id");
+      const contentInput = document.getElementById("content");
+      const streamBox = document.getElementById("stream");
+      const historyBox = document.getElementById("history");
+
+      function baseUrl() {
+        return baseUrlInput.value.replace(/\/$/, "");
+      }
+
+      document.getElementById("login-btn").addEventListener("click", async () => {
+        const response = await fetch(`${baseUrl()}/auth/login`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            email: emailInput.value,
+            password: passwordInput.value,
+          }),
+        });
+        streamBox.textContent = `login status: ${response.status}\n${await response.text()}`;
+      });
+
+      document.getElementById("create-btn").addEventListener("click", async () => {
+        const response = await fetch(`${baseUrl()}/conversations`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ title: "流式演示" }),
+        });
+        const body = await response.json();
+        if (body.conversation?.id) {
+          conversationInput.value = body.conversation.id;
+        }
+        streamBox.textContent = JSON.stringify(body, null, 2);
+      });
+
+      document.getElementById("send-btn").addEventListener("click", async () => {
+        const id = conversationInput.value;
+        if (!id) {
+          streamBox.textContent = "请先创建或填写会话 ID";
+          return;
+        }
+        streamBox.textContent = "连接中…\n";
+        const response = await fetch(`${baseUrl()}/conversations/${id}/messages`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ content: contentInput.value }),
+        });
+        const text = await response.text();
+        streamBox.textContent = `status: ${response.status}\ncontent-type: ${response.headers.get(
+          "content-type",
+        )}\n\n${text}`;
+      });
+
+      document.getElementById("history-btn").addEventListener("click", async () => {
+        const id = conversationInput.value;
+        if (!id) {
+          historyBox.textContent = "请先创建或填写会话 ID";
+          return;
+        }
+        const response = await fetch(`${baseUrl()}/conversations/${id}/messages`, {
+          credentials: "include",
+        });
+        historyBox.textContent = `status: ${response.status}\n\n${await response.text()}`;
+      });
+    </script>
+  </body>
+</html>

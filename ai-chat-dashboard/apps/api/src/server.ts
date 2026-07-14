@@ -3,6 +3,7 @@ import { createDatabase, readDatabaseConfig } from "@ai-chat-dashboard/database"
 import { buildApp } from "./app.js";
 import { createDatabaseUserRepository } from "./auth/users.js";
 import { createDatabaseConversationRepository } from "./conversations/repository.js";
+import { createDatabaseMessageRepository } from "./messages/repository.js";
 
 const port = Number(process.env.API_PORT ?? 3001);
 const host = process.env.API_HOST ?? "0.0.0.0";
@@ -21,6 +22,7 @@ const app = buildApp({
   },
   users: createDatabaseUserRepository(database),
   conversations: createDatabaseConversationRepository(database),
+  messages: createDatabaseMessageRepository(database),
 });
 
 app.addHook("onClose", async () => database.close());
