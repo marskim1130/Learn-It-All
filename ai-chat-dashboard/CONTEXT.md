@@ -14,6 +14,14 @@ _Avoid_: Account, Client
 登录后写入 HttpOnly Cookie 的不透明会话令牌；服务端会话表可作废。
 _Avoid_: JWT（本项目第一版会话不是 JWT）, Bearer header token
 
+**Auth Session**：
+登录身份在服务端的可作废映射（Access Token → User id），以及从 Cookie 解析当前 User 的领域能力。
+_Avoid_: Login state, Cookie jar, JWT session
+
+**Session Store**：
+Auth Session 背后的令牌存储接缝；内存 Map 与未来 Redis 都是适配器。
+_Avoid_: Cache, Token database
+
 **Conversation**：
 用户拥有的聊天容器，有标题；删除时级联清理消息。
 _Avoid_: Chat room, Thread, Session（Session 专指登录会话）

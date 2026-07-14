@@ -191,3 +191,7 @@
 2026-07-14 14:56 +08:00 --- Chat Turn 需锁定所有权、模板、模型失败与标题策略 --- 补充领域行为测试：会话/他人隔离、模板渲染与缺变量、模型失败事件、非默认标题不入队；实现已覆盖这些路径故测试直接转绿 --- 修改 `apps/api/test/chat-turn.test.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除新增用例并删除本条审计记录。
 
 2026-07-14 14:58 +08:00 --- HTTP 发送路由仍内联编排，与 ChatTurn module 重复 --- 将 `POST /conversations/:id/messages` 改为 adapter：解析 body/multipart → Utterance → `chatTurn.stream` → 缓冲 SSE 映射；领域错误映射 400/404；回归 messages/attachments/template/title/e2e 全绿 --- 修改 `apps/api/src/chat-turn/sse.ts`、`apps/api/src/app.ts`、`work.md`。撤回方式 [Rollback Strategy]：恢复 app.ts 消息路由旧实现并删除 sse.ts，保留 chat-turn 领域模块。
+
+2026-07-14 15:12 +08:00 --- C2 加深 Auth Session：会话 Map 不可注入且 UNAUTHORIZED 门控重复 --- 进入红阶段 [RED]，补充 AuthSession 创建/解析/撤销与无效 Cookie 的失败测试，并扩展 CONTEXT 术语 --- 修改 `CONTEXT.md`、`apps/api/test/auth-session-module.test.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除测试与 CONTEXT 新增词条及本条审计记录。
+
+2026-07-14 15:23 +08:00 --- Auth Session module 缺失导致红灯 --- 实现 `SessionStore` + `AuthSession`（create/resolve/revoke + Cookie 头），`buildApp` 注入并替换 login/me/logout 与全部 13 处鉴权门控；删除内联 sessions Map/helper；领域与 HTTP 会话/限流/消息/e2e 回归通过 --- 修改 `apps/api/src/auth/session.ts`、`apps/api/src/app.ts`、`CONTEXT.md`、`work.md`。撤回方式 [Rollback Strategy]：`git revert` 本改动或恢复 app.ts 会话逻辑并删除 session.ts。

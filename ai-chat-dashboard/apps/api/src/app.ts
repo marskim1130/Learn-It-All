@@ -6,6 +6,12 @@ import {
 } from "./auth/login-rate-limit.js";
 import { hashPassword, verifyPassword } from "./auth/password.js";
 import {
+  createAuthSession,
+  createMemorySessionStore,
+  type AuthSession,
+  type SessionStore,
+} from "./auth/session.js";
+import {
   createMemoryUserRepository,
   EmailAlreadyExistsError,
   type UserRepository,
@@ -65,6 +71,8 @@ interface AppDependencies {
   chatModel?: ChatModelProvider;
   loginRateLimiter?: LoginRateLimiter;
   titleQueue?: ConversationTitleQueue;
+  sessionStore?: SessionStore;
+  authSession?: AuthSession;
   logger?: StructuredLogger;
   shutdown?: ShutdownController;
 }
@@ -102,6 +110,14 @@ export function buildApp(dependencies?: AppDependencies) {
   const loginRateLimiter =
     dependencies?.loginRateLimiter ?? createMemoryLoginRateLimiter();
   const titleQueue = dependencies?.titleQueue ?? createNoopTitleQueue();
+  const sessionStore =
+    dependencies?.sessionStore ?? createMemorySessionStore();
+  const authSession =
+    dependencies?.authSession ??
+    createAuthSession({
+      users,
+      store: sessionStore,
+    });
   const chatTurn = createChatTurnModule({
     conversations,
     messages,
@@ -112,8 +128,6 @@ export function buildApp(dependencies?: AppDependencies) {
   const logger = dependencies?.logger ?? createStructuredLogger({ service: "api" });
   const shutdown =
     dependencies?.shutdown ?? createShutdownController({ logger });
-  /** 进程内会话表：access_token -> userId。退出时删除条目使旧令牌失效。 */
-  const sessions = new Map<string, string>();
 
   app.addHook("onRequest", async (request, reply) => {
     const incoming = request.headers["x-request-id"];
@@ -299,13 +313,8 @@ export function buildApp(dependencies?: AppDependencies) {
 
     await loginRateLimiter.clear(email);
 
-    const accessToken = crypto.randomUUID();
-    sessions.set(accessToken, user.id);
-
-    reply.header(
-      "set-cookie",
-      `access_token=${accessToken}; HttpOnly; Path=/; SameSite=Lax`,
-    );
+    const session = await authSession.createSession(user.id);
+    reply.header("set-cookie", session.setCookieHeader);
 
     return reply.status(200).send({
       user: {
@@ -327,7 +336,7 @@ export function buildApp(dependencies?: AppDependencies) {
    * });
    */
   app.get("/auth/me", async (request, reply) => {
-    const user = await resolveCurrentUser(request.headers.cookie, sessions, users);
+    const user = await authSession.resolveUser(request.headers.cookie);
     if (!user) {
       return reply.status(401).send({
         error: {
@@ -357,18 +366,10 @@ export function buildApp(dependencies?: AppDependencies) {
    * });
    */
   app.post("/auth/logout", async (request, reply) => {
-    const accessToken = readAccessToken(request.headers.cookie);
-    if (accessToken) {
-      sessions.delete(accessToken);
-    }
-
-    reply.header(
-      "set-cookie",
-      "access_token=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0",
-    );
+    const revoked = await authSession.revokeSession(request.headers.cookie);
+    reply.header("set-cookie", revoked.clearCookieHeader);
     return reply.status(204).send();
   });
-
   /**
    * 为当前登录用户创建聊天会话。
    *
@@ -382,7 +383,7 @@ export function buildApp(dependencies?: AppDependencies) {
    * // 201 -> { conversation: { id, title, createdAt, updatedAt } }
    */
   app.post("/conversations", async (request, reply) => {
-    const user = await resolveCurrentUser(request.headers.cookie, sessions, users);
+    const user = await authSession.resolveUser(request.headers.cookie);
     if (!user) {
       return reply.status(401).send({
         error: {
@@ -424,7 +425,7 @@ export function buildApp(dependencies?: AppDependencies) {
    * });
    */
   app.get("/conversations", async (request, reply) => {
-    const user = await resolveCurrentUser(request.headers.cookie, sessions, users);
+    const user = await authSession.resolveUser(request.headers.cookie);
     if (!user) {
       return reply.status(401).send({
         error: {
@@ -456,7 +457,7 @@ export function buildApp(dependencies?: AppDependencies) {
    * });
    */
   app.get("/conversations/:id", async (request, reply) => {
-    const user = await resolveCurrentUser(request.headers.cookie, sessions, users);
+    const user = await authSession.resolveUser(request.headers.cookie);
     if (!user) {
       return reply.status(401).send({
         error: {
@@ -499,7 +500,7 @@ export function buildApp(dependencies?: AppDependencies) {
    * });
    */
   app.patch("/conversations/:id", async (request, reply) => {
-    const user = await resolveCurrentUser(request.headers.cookie, sessions, users);
+    const user = await authSession.resolveUser(request.headers.cookie);
     if (!user) {
       return reply.status(401).send({
         error: {
@@ -558,7 +559,7 @@ export function buildApp(dependencies?: AppDependencies) {
    * });
    */
   app.delete("/conversations/:id", async (request, reply) => {
-    const user = await resolveCurrentUser(request.headers.cookie, sessions, users);
+    const user = await authSession.resolveUser(request.headers.cookie);
     if (!user) {
       return reply.status(401).send({
         error: {
@@ -593,7 +594,7 @@ export function buildApp(dependencies?: AppDependencies) {
    * });
    */
   app.get("/conversations/:id/messages", async (request, reply) => {
-    const user = await resolveCurrentUser(request.headers.cookie, sessions, users);
+    const user = await authSession.resolveUser(request.headers.cookie);
     if (!user) {
       return reply.status(401).send({
         error: {
@@ -636,7 +637,7 @@ export function buildApp(dependencies?: AppDependencies) {
    * // text/event-stream: message.user → started → delta* → completed
    */
   app.post("/conversations/:id/messages", async (request, reply) => {
-    const user = await resolveCurrentUser(request.headers.cookie, sessions, users);
+    const user = await authSession.resolveUser(request.headers.cookie);
     if (!user) {
       return reply.status(401).send({
         error: {
@@ -737,7 +738,7 @@ export function buildApp(dependencies?: AppDependencies) {
    * 提取 Prompt 模板中的双花括号变量。
    */
   app.get("/prompt-templates/:id/variables", async (request, reply) => {
-    const user = await resolveCurrentUser(request.headers.cookie, sessions, users);
+    const user = await authSession.resolveUser(request.headers.cookie);
     if (!user) {
       return reply.status(401).send({
         error: {
@@ -780,7 +781,7 @@ export function buildApp(dependencies?: AppDependencies) {
    * });
    */
   app.post("/prompt-templates", async (request, reply) => {
-    const user = await resolveCurrentUser(request.headers.cookie, sessions, users);
+    const user = await authSession.resolveUser(request.headers.cookie);
     if (!user) {
       return reply.status(401).send({
         error: {
@@ -840,7 +841,7 @@ export function buildApp(dependencies?: AppDependencies) {
    * 列出当前用户的 Prompt 模板，支持 q 子串筛选。
    */
   app.get("/prompt-templates", async (request, reply) => {
-    const user = await resolveCurrentUser(request.headers.cookie, sessions, users);
+    const user = await authSession.resolveUser(request.headers.cookie);
     if (!user) {
       return reply.status(401).send({
         error: {
@@ -861,7 +862,7 @@ export function buildApp(dependencies?: AppDependencies) {
    * 读取当前用户的单个 Prompt 模板。
    */
   app.get("/prompt-templates/:id", async (request, reply) => {
-    const user = await resolveCurrentUser(request.headers.cookie, sessions, users);
+    const user = await authSession.resolveUser(request.headers.cookie);
     if (!user) {
       return reply.status(401).send({
         error: {
@@ -891,7 +892,7 @@ export function buildApp(dependencies?: AppDependencies) {
    * 更新当前用户的 Prompt 模板。
    */
   app.patch("/prompt-templates/:id", async (request, reply) => {
-    const user = await resolveCurrentUser(request.headers.cookie, sessions, users);
+    const user = await authSession.resolveUser(request.headers.cookie);
     if (!user) {
       return reply.status(401).send({
         error: {
@@ -974,7 +975,7 @@ export function buildApp(dependencies?: AppDependencies) {
    * 删除当前用户的 Prompt 模板。
    */
   app.delete("/prompt-templates/:id", async (request, reply) => {
-    const user = await resolveCurrentUser(request.headers.cookie, sessions, users);
+    const user = await authSession.resolveUser(request.headers.cookie);
     if (!user) {
       return reply.status(401).send({
         error: {
@@ -1115,34 +1116,4 @@ async function parseMultipartMessageRequest(request: {
   }
 
   return { content, promptTemplateId, variables, attachment };
-}
-
-async function resolveCurrentUser(
-  cookieHeader: string | undefined,
-  sessions: Map<string, string>,
-  users: UserRepository,
-) {
-  const accessToken = readAccessToken(cookieHeader);
-  if (!accessToken) {
-    return null;
-  }
-
-  const userId = sessions.get(accessToken);
-  if (!userId) {
-    return null;
-  }
-
-  return users.findById(userId);
-}
-
-function readAccessToken(cookieHeader: string | undefined): string | undefined {
-  if (!cookieHeader) {
-    return undefined;
-  }
-
-  return cookieHeader
-    .split(";")
-    .map((part) => part.trim())
-    .find((part) => part.startsWith("access_token="))
-    ?.slice("access_token=".length);
 }
