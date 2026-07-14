@@ -19,8 +19,13 @@ import {
   type ChatModelProvider,
 } from "./chat/provider.js";
 import {
+  ChatTurnError,
+  createChatTurnModule,
+  Utterance,
+} from "./chat-turn/index.js";
+import { bufferChatTurnAsSse } from "./chat-turn/sse.js";
+import {
   AttachmentValidationError,
-  mergeMessageContentWithAttachment,
   parseTextAttachment,
   type ParsedAttachment,
 } from "./messages/attachments.js";
@@ -34,13 +39,9 @@ import {
   type PromptTemplate,
   type PromptTemplateRepository,
 } from "./prompt-templates/repository.js";
-import {
-  extractTemplateVariables,
-  renderTemplate,
-} from "./prompt-templates/variables.js";
+import { extractTemplateVariables } from "./prompt-templates/variables.js";
 import {
   createNoopTitleQueue,
-  shouldEnqueueTitleJob,
   type ConversationTitleQueue,
 } from "./jobs/title-queue.js";
 import {
@@ -101,6 +102,13 @@ export function buildApp(dependencies?: AppDependencies) {
   const loginRateLimiter =
     dependencies?.loginRateLimiter ?? createMemoryLoginRateLimiter();
   const titleQueue = dependencies?.titleQueue ?? createNoopTitleQueue();
+  const chatTurn = createChatTurnModule({
+    conversations,
+    messages,
+    promptTemplates,
+    chatModel,
+    titleQueue,
+  });
   const logger = dependencies?.logger ?? createStructuredLogger({ service: "api" });
   const shutdown =
     dependencies?.shutdown ?? createShutdownController({ logger });
@@ -639,18 +647,6 @@ export function buildApp(dependencies?: AppDependencies) {
     }
 
     const { id: conversationId } = request.params as { id: string };
-    const conversation = await conversations.findByIdForOwner(
-      conversationId,
-      user.id,
-    );
-    if (!conversation) {
-      return reply.status(404).send({
-        error: {
-          code: "NOT_FOUND",
-          message: "会话不存在",
-        },
-      });
-    }
 
     let content = "";
     let promptTemplateId: string | null = null;
@@ -690,174 +686,53 @@ export function buildApp(dependencies?: AppDependencies) {
         body.variables && typeof body.variables === "object" ? body.variables : {};
     }
 
-    if (promptTemplateId) {
-      const template = await promptTemplates.findByIdForOwner(
-        promptTemplateId,
-        user.id,
-      );
-      if (!template) {
-        return reply.status(404).send({
-          error: {
-            code: "NOT_FOUND",
-            message: "模板不存在",
-          },
-        });
-      }
+    let utterance = promptTemplateId
+      ? Utterance.template(promptTemplateId, variables)
+      : Utterance.plain(content);
+    if (attachment) {
+      utterance = Utterance.withAttachment(utterance, attachment);
+    }
 
-      const required = extractTemplateVariables(template.body);
-      const missing = required.filter((name) => {
-        const value = variables[name];
-        return typeof value !== "string" || value.trim().length === 0;
-      });
-      if (missing.length > 0) {
+    try {
+      const body = await bufferChatTurnAsSse(
+        chatTurn.stream(
+          { ownerId: user.id, conversationId },
+          utterance,
+        ),
+      );
+
+      return reply
+        .status(200)
+        .header("content-type", "text/event-stream; charset=utf-8")
+        .header("cache-control", "no-cache")
+        .send(body);
+    } catch (error) {
+      if (error instanceof ChatTurnError) {
+        if (
+          error.code === "CONVERSATION_NOT_FOUND" ||
+          error.code === "PROMPT_TEMPLATE_NOT_FOUND"
+        ) {
+          return reply.status(404).send({
+            error: {
+              code: "NOT_FOUND",
+              message: error.message,
+            },
+          });
+        }
+
         return reply.status(400).send({
           error: {
             code: "VALIDATION_ERROR",
             message: "请求参数无效",
-            details: missing.map((name) => ({
-              field: `variables.${name}`,
-              message: `缺少变量 ${name}`,
-            })),
+            details: error.details ?? [
+              { field: "content", message: error.message },
+            ],
           },
         });
       }
-
-      const values: Record<string, string> = {};
-      for (const name of required) {
-        values[name] = String(variables[name]).trim();
-      }
-      content = renderTemplate(template.body, values);
-      promptTemplateId = template.id;
+      throw error;
     }
-
-    content = mergeMessageContentWithAttachment(content, attachment);
-
-    if (!content) {
-      return reply.status(400).send({
-        error: {
-          code: "VALIDATION_ERROR",
-          message: "请求参数无效",
-          details: [
-            {
-              field: "content",
-              message: "消息内容不能为空",
-            },
-          ],
-        },
-      });
-    }
-
-    const userMessage = await messages.create({
-      conversationId,
-      role: "user",
-      content,
-      status: "completed",
-      promptTemplateId,
-      attachment: attachment
-        ? {
-            fileName: attachment.fileName,
-            mimeType: attachment.mimeType,
-            sizeBytes: attachment.sizeBytes,
-          }
-        : null,
-    });
-
-    // 首条消息后异步入队标题任务；失败不影响聊天主路径
-    try {
-      const historyForTitle = await messages.listByConversation(conversationId);
-      const userMessageCount = historyForTitle.filter(
-        (item) => item.role === "user",
-      ).length;
-      if (
-        shouldEnqueueTitleJob({
-          conversationTitle: conversation.title,
-          userMessageCount,
-        })
-      ) {
-        await titleQueue.enqueue({
-          conversationId,
-          ownerId: user.id,
-          seedText: content,
-        });
-      }
-    } catch {
-      // 队列不可用时静默降级
-    }
-
-    const assistantMessage = await messages.create({
-      conversationId,
-      role: "assistant",
-      content: "",
-      status: "generating",
-      promptTemplateId: null,
-      attachment: null,
-    });
-
-    const history = await messages.listByConversation(conversationId);
-    const chunks: string[] = [];
-    chunks.push(formatSseEvent("message.user", toPublicMessage(userMessage)));
-    chunks.push(
-      formatSseEvent("message.assistant.started", toPublicMessage(assistantMessage)),
-    );
-
-    let assistantContent = "";
-    try {
-      for await (const chunk of chatModel.stream({
-        messages: history
-          .filter((item) => item.status === "completed" || item.id === userMessage.id)
-          .map((item) => ({
-            role: item.role,
-            content: item.content,
-          })),
-      })) {
-        assistantContent += chunk.delta;
-        chunks.push(
-          formatSseEvent("message.assistant.delta", {
-            id: assistantMessage.id,
-            delta: chunk.delta,
-          }),
-        );
-      }
-
-      const completed =
-        (await messages.update(assistantMessage.id, {
-          content: assistantContent,
-          status: "completed",
-        })) ?? {
-          ...assistantMessage,
-          content: assistantContent,
-          status: "completed" as const,
-        };
-
-      chunks.push(
-        formatSseEvent("message.assistant.completed", toPublicMessage(completed)),
-      );
-    } catch {
-      const failed =
-        (await messages.update(assistantMessage.id, {
-          content: assistantContent,
-          status: "failed",
-        })) ?? {
-          ...assistantMessage,
-          content: assistantContent,
-          status: "failed" as const,
-        };
-
-      chunks.push(
-        formatSseEvent("message.assistant.failed", {
-          ...toPublicMessage(failed),
-          message: "模型生成失败",
-        }),
-      );
-    }
-
-    return reply
-      .status(200)
-      .header("content-type", "text/event-stream; charset=utf-8")
-      .header("cache-control", "no-cache")
-      .send(chunks.join(""));
   });
-
   /**
    * 提取 Prompt 模板中的双花括号变量。
    */
@@ -1148,10 +1023,6 @@ function toPublicMessage(message: Message) {
     attachment: message.attachment,
     createdAt: message.createdAt.toISOString(),
   };
-}
-
-function formatSseEvent(event: string, data: unknown): string {
-  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 }
 
 async function parseMultipartMessageRequest(request: {

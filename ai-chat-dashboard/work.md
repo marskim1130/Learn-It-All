@@ -183,3 +183,11 @@
 2026-07-14 14:10 +08:00 --- Issue 014 需要关联 ID、脱敏日志、关闭中拒绝请求与信号钩子 --- 实现 observability 模块并接入 app/server/worker，补充契约测试与文档验收 --- 修改 `apps/api/src/observability/*`、`apps/api/src/app.ts`、`apps/api/src/server.ts`、`apps/api/src/title-worker-main.ts`、`apps/api/test/runtime-hardening.test.ts`、`docs/learning/issue-014-runtime-hardening.md`、`docs/learning/README.md`、`docs/issues/014.md`、`README.md`、`work.md`。撤回方式 [Rollback Strategy]：删除 observability 与加固测试/文档，恢复 app/server/worker 到 Issue 013 完成后版本，并删除本条审计记录。
 
 2026-07-14 14:15 +08:00 --- Issue 015 缺少串联旅程测试、CI Redis 与运行手册 --- 新增核心用户旅程 e2e（假模型）、CI 增加 Redis/CHAT_PROVIDER=echo，并补充 RUNBOOK 与验收勾选 --- 修改 `apps/api/test/core-journey.e2e.test.ts`、`.github/workflows/ci.yml`、`docs/RUNBOOK.md`、`docs/learning/issue-015-core-journey.md`、`docs/learning/README.md`、`docs/issues/015.md`、`README.md`、`work.md`。撤回方式 [Rollback Strategy]：删除 e2e/RUNBOOK/学习记录，恢复 CI 与 README/Issue 015，并删除本条审计记录。
+
+2026-07-14 14:52 +08:00 --- C1 加深 Chat Turn：先固化领域语言与首个可执行规格 --- 新增 `CONTEXT.md`（Chat Turn / Utterance / Chat Turn Event 等），并添加 `ChatTurnModule.stream` 明文路径的单个失败测试作为示踪弹 --- 修改 `CONTEXT.md`、`apps/api/test/chat-turn.test.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除 CONTEXT.md 与 chat-turn 测试及本条审计记录。
+
+2026-07-14 14:53 +08:00 --- ChatTurn module 不存在导致示踪弹失败 --- 进入绿阶段 [GREEN]，实现 `createChatTurnModule.stream`：明文路径编排、领域事件序、标题入队与模型流；尚未改 HTTP 路由 --- 修改 `apps/api/src/chat-turn/types.ts`、`apps/api/src/chat-turn/index.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除 chat-turn 模块与本条审计记录。
+
+2026-07-14 14:56 +08:00 --- Chat Turn 需锁定所有权、模板、模型失败与标题策略 --- 补充领域行为测试：会话/他人隔离、模板渲染与缺变量、模型失败事件、非默认标题不入队；实现已覆盖这些路径故测试直接转绿 --- 修改 `apps/api/test/chat-turn.test.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除新增用例并删除本条审计记录。
+
+2026-07-14 14:58 +08:00 --- HTTP 发送路由仍内联编排，与 ChatTurn module 重复 --- 将 `POST /conversations/:id/messages` 改为 adapter：解析 body/multipart → Utterance → `chatTurn.stream` → 缓冲 SSE 映射；领域错误映射 400/404；回归 messages/attachments/template/title/e2e 全绿 --- 修改 `apps/api/src/chat-turn/sse.ts`、`apps/api/src/app.ts`、`work.md`。撤回方式 [Rollback Strategy]：恢复 app.ts 消息路由旧实现并删除 sse.ts，保留 chat-turn 领域模块。
