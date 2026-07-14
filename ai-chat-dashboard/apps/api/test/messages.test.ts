@@ -143,6 +143,7 @@ describe("POST /conversations/:id/messages", () => {
       role: "user",
       content: "你好",
       status: "completed",
+      promptTemplateId: null,
       createdAt: expect.any(String),
     });
 
@@ -151,6 +152,7 @@ describe("POST /conversations/:id/messages", () => {
       role: "assistant",
       content: "",
       status: "generating",
+      promptTemplateId: null,
       createdAt: expect.any(String),
     });
 
@@ -168,6 +170,7 @@ describe("POST /conversations/:id/messages", () => {
       role: "assistant",
       content: "你好",
       status: "completed",
+      promptTemplateId: null,
       createdAt: expect.any(String),
     });
 
@@ -202,6 +205,7 @@ describe("POST /conversations/:id/messages", () => {
           role: "user",
           content: "你好",
           status: "completed",
+          promptTemplateId: null,
           createdAt: expect.any(String),
         },
         {
@@ -209,6 +213,7 @@ describe("POST /conversations/:id/messages", () => {
           role: "assistant",
           content: "你好",
           status: "completed",
+          promptTemplateId: null,
           createdAt: expect.any(String),
         },
       ],
@@ -306,6 +311,7 @@ describe("POST /conversations/:id/messages", () => {
       role: "assistant",
       content: "半",
       status: "failed",
+      promptTemplateId: null,
       createdAt: expect.any(String),
       message: expect.any(String),
     });
@@ -322,6 +328,7 @@ describe("POST /conversations/:id/messages", () => {
         role: "user",
         content: "你好",
         status: "completed",
+        promptTemplateId: null,
         createdAt: expect.any(String),
       },
       {
@@ -329,6 +336,7 @@ describe("POST /conversations/:id/messages", () => {
         role: "assistant",
         content: "半",
         status: "failed",
+        promptTemplateId: null,
         createdAt: expect.any(String),
       },
     ]);

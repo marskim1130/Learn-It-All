@@ -11,6 +11,7 @@
 - [Issue 007：OpenAI 兼容模型](issue-007-openai-compatible.md)
 - [Issue 008：聊天交互与长会话性能](issue-008-chat-performance.md)
 - [Issue 009：基础 Prompt 模板](issue-009-prompt-templates.md)
+- [Issue 010：带变量的 Prompt 模板](issue-010-prompt-variables.md)
 
 - TypeScript：泛型 [Generics]、类型推导 [Type Inference]、工具类型 [Utility Types]。
 - React：状态所有权 [State Ownership]、并发渲染 [Concurrent Rendering]、性能测量和虚拟化 [Virtualization]。

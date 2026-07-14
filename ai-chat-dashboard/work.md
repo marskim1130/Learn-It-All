@@ -161,3 +161,11 @@
 2026-07-14 10:52 +08:00 --- `POST /prompt-templates` 因路由不存在返回 404 --- 进入绿阶段 [GREEN]，添加内存模板仓储与完整 CRUD 路由（创建/列表/详情/更新/删除）及基础校验；后续测试锁定筛选与隔离 --- 修改 `apps/api/src/prompt-templates/repository.ts`、`apps/api/src/app.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除模板模块与相关路由，并删除本条审计记录。
 
 2026-07-14 10:55 +08:00 --- Issue 009 需要筛选、隔离、数据库表与文档 --- 补充 CRUD/筛选/跨用户测试，新增 `prompt_templates` 迁移与数据库仓储接入 server，同步学习记录、Demo、README 与验收 --- 修改 `apps/api/test/prompt-templates.test.ts`、`apps/api/src/prompt-templates/repository.ts`、`apps/api/src/server.ts`、`packages/database/src/schema.ts`、`packages/database/src/index.ts`、`packages/database/drizzle/0004_prompt_templates.sql`、`packages/database/drizzle/meta/_journal.json`、`docs/learning/issue-009-prompt-templates.md`、`docs/learning/README.md`、`docs/demos/prompt-templates.html`、`docs/issues/009.md`、`README.md`、`work.md`。撤回方式 [Rollback Strategy]：删除本条所列新增文件，恢复被改文件到 Issue 008 完成后的版本，并删除本条审计记录。
+
+2026-07-14 11:08 +08:00 --- Issue 010 缺少可执行的变量提取与渲染规格 --- 进入测试驱动开发 [TDD] 红阶段 [RED]，添加提取去重 `{{var}}` 与渲染替换的失败测试，未实现工具函数 --- 修改 `apps/api/test/prompt-variables.test.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除该测试文件与本条审计记录。
+
+2026-07-14 11:09 +08:00 --- 变量工具模块不存在导致测试无法收集 --- 进入绿阶段 [GREEN]，实现 `extractTemplateVariables` 与 `renderTemplate` --- 修改 `apps/api/src/prompt-templates/variables.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除变量工具模块与本条审计记录。
+
+2026-07-14 11:11 +08:00 --- Issue 010 需要变量 API、消息渲染与模板来源持久化 --- 添加 variables 路由与带模板发送消息行为测试，消息仓储增加 `promptTemplateId`，发送路径支持模板校验/渲染，并新增 messages 外键迁移 --- 修改 `apps/api/test/prompt-render-messages.test.ts`、`apps/api/src/app.ts`、`apps/api/src/messages/repository.ts`、`packages/database/src/schema.ts`、`packages/database/drizzle/0005_messages_prompt_template.sql`、`packages/database/drizzle/meta/_journal.json`、`work.md`。撤回方式 [Rollback Strategy]：删除新增测试与迁移，回退消息与 app 变更，并删除本条审计记录。
+
+2026-07-14 11:13 +08:00 --- Issue 010 行为测试已通过，但缺少文档与验收勾选；旧消息测试未包含 `promptTemplateId` --- 更新消息测试断言，同步学习记录、变量 Demo、README 与 Issue 验收 --- 修改 `apps/api/test/messages.test.ts`、`docs/learning/issue-010-prompt-variables.md`、`docs/learning/README.md`、`docs/demos/prompt-variables.html`、`docs/issues/010.md`、`README.md`、`work.md`。撤回方式 [Rollback Strategy]：删除新增文档/Demo，恢复 README/Issue/消息测试与本条审计记录。

@@ -35,17 +35,6 @@ export const conversations = pgTable("conversations", {
 /**
  * 消息表：归属会话；删除会话时由外键 ON DELETE CASCADE 清理。
  */
-export const messages = pgTable("messages", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  conversationId: uuid("conversation_id")
-    .notNull()
-    .references(() => conversations.id, { onDelete: "cascade" }),
-  role: text("role").notNull(),
-  content: text("content").notNull().default(""),
-  status: text("status").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
-});
-
 /**
  * Prompt 模板表：归属单个用户，列表筛选始终约束 owner_id。
  */
@@ -60,6 +49,20 @@ export const promptTemplates = pgTable("prompt_templates", {
   tags: jsonb("tags").$type<string[]>().notNull().default([]),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+});
+
+export const messages = pgTable("messages", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  conversationId: uuid("conversation_id")
+    .notNull()
+    .references(() => conversations.id, { onDelete: "cascade" }),
+  role: text("role").notNull(),
+  content: text("content").notNull().default(""),
+  status: text("status").notNull(),
+  promptTemplateId: uuid("prompt_template_id").references(() => promptTemplates.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });
 
 export const schema = {

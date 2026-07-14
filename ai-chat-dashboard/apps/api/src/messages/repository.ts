@@ -13,6 +13,7 @@ export interface Message {
   role: MessageRole;
   content: string;
   status: MessageStatus;
+  promptTemplateId: string | null;
   createdAt: Date;
 }
 
@@ -21,6 +22,7 @@ export interface CreateMessageInput {
   role: MessageRole;
   content: string;
   status: MessageStatus;
+  promptTemplateId?: string | null;
 }
 
 /**
@@ -58,6 +60,7 @@ export function createMemoryMessageRepository(seed: Message[] = []): MessageRepo
         role: input.role,
         content: input.content,
         status: input.status,
+        promptTemplateId: input.promptTemplateId ?? null,
         createdAt: new Date(),
       };
       records.set(message.id, message);
@@ -89,6 +92,7 @@ function mapRow(row: {
   role: string;
   content: string;
   status: string;
+  promptTemplateId: string | null;
   createdAt: Date;
 }): Message {
   return {
@@ -97,6 +101,7 @@ function mapRow(row: {
     role: row.role as MessageRole,
     content: row.content,
     status: row.status as MessageStatus,
+    promptTemplateId: row.promptTemplateId,
     createdAt: row.createdAt,
   };
 }
@@ -114,6 +119,7 @@ export function createDatabaseMessageRepository(database: Database): MessageRepo
           role: input.role,
           content: input.content,
           status: input.status,
+          promptTemplateId: input.promptTemplateId ?? null,
         })
         .returning({
           id: messagesTable.id,
@@ -121,6 +127,7 @@ export function createDatabaseMessageRepository(database: Database): MessageRepo
           role: messagesTable.role,
           content: messagesTable.content,
           status: messagesTable.status,
+          promptTemplateId: messagesTable.promptTemplateId,
           createdAt: messagesTable.createdAt,
         });
 
@@ -144,6 +151,7 @@ export function createDatabaseMessageRepository(database: Database): MessageRepo
           role: messagesTable.role,
           content: messagesTable.content,
           status: messagesTable.status,
+          promptTemplateId: messagesTable.promptTemplateId,
           createdAt: messagesTable.createdAt,
         });
 
@@ -157,6 +165,7 @@ export function createDatabaseMessageRepository(database: Database): MessageRepo
           role: messagesTable.role,
           content: messagesTable.content,
           status: messagesTable.status,
+          promptTemplateId: messagesTable.promptTemplateId,
           createdAt: messagesTable.createdAt,
         })
         .from(messagesTable)

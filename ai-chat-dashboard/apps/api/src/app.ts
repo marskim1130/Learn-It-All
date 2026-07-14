@@ -24,6 +24,10 @@ import {
   type PromptTemplate,
   type PromptTemplateRepository,
 } from "./prompt-templates/repository.js";
+import {
+  extractTemplateVariables,
+  renderTemplate,
+} from "./prompt-templates/variables.js";
 
 interface AppDependencies {
   database: {
@@ -535,22 +539,11 @@ export function buildApp(dependencies?: AppDependencies) {
       });
     }
 
-    const body = request.body as { content?: string };
-    const content = typeof body.content === "string" ? body.content.trim() : "";
-    if (!content) {
-      return reply.status(400).send({
-        error: {
-          code: "VALIDATION_ERROR",
-          message: "请求参数无效",
-          details: [
-            {
-              field: "content",
-              message: "消息内容不能为空",
-            },
-          ],
-        },
-      });
-    }
+    const body = request.body as {
+      content?: string;
+      promptTemplateId?: string;
+      variables?: Record<string, string>;
+    };
 
     const { id: conversationId } = request.params as { id: string };
     const conversation = await conversations.findByIdForOwner(
@@ -566,11 +559,72 @@ export function buildApp(dependencies?: AppDependencies) {
       });
     }
 
+    let content = typeof body.content === "string" ? body.content.trim() : "";
+    let promptTemplateId: string | null = null;
+
+    if (typeof body.promptTemplateId === "string" && body.promptTemplateId) {
+      const template = await promptTemplates.findByIdForOwner(
+        body.promptTemplateId,
+        user.id,
+      );
+      if (!template) {
+        return reply.status(404).send({
+          error: {
+            code: "NOT_FOUND",
+            message: "模板不存在",
+          },
+        });
+      }
+
+      const required = extractTemplateVariables(template.body);
+      const provided =
+        body.variables && typeof body.variables === "object" ? body.variables : {};
+      const missing = required.filter((name) => {
+        const value = provided[name];
+        return typeof value !== "string" || value.trim().length === 0;
+      });
+      if (missing.length > 0) {
+        return reply.status(400).send({
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "请求参数无效",
+            details: missing.map((name) => ({
+              field: `variables.${name}`,
+              message: `缺少变量 ${name}`,
+            })),
+          },
+        });
+      }
+
+      const values: Record<string, string> = {};
+      for (const name of required) {
+        values[name] = String(provided[name]).trim();
+      }
+      content = renderTemplate(template.body, values);
+      promptTemplateId = template.id;
+    }
+
+    if (!content) {
+      return reply.status(400).send({
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "请求参数无效",
+          details: [
+            {
+              field: "content",
+              message: "消息内容不能为空",
+            },
+          ],
+        },
+      });
+    }
+
     const userMessage = await messages.create({
       conversationId,
       role: "user",
       content,
       status: "completed",
+      promptTemplateId,
     });
 
     const assistantMessage = await messages.create({
@@ -578,6 +632,7 @@ export function buildApp(dependencies?: AppDependencies) {
       role: "assistant",
       content: "",
       status: "generating",
+      promptTemplateId: null,
     });
 
     const history = await messages.listByConversation(conversationId);
@@ -643,6 +698,36 @@ export function buildApp(dependencies?: AppDependencies) {
       .header("content-type", "text/event-stream; charset=utf-8")
       .header("cache-control", "no-cache")
       .send(chunks.join(""));
+  });
+
+  /**
+   * 提取 Prompt 模板中的双花括号变量。
+   */
+  app.get("/prompt-templates/:id/variables", async (request, reply) => {
+    const user = await resolveCurrentUser(request.headers.cookie, sessions, users);
+    if (!user) {
+      return reply.status(401).send({
+        error: {
+          code: "UNAUTHORIZED",
+          message: "未登录或会话已失效",
+        },
+      });
+    }
+
+    const { id } = request.params as { id: string };
+    const template = await promptTemplates.findByIdForOwner(id, user.id);
+    if (!template) {
+      return reply.status(404).send({
+        error: {
+          code: "NOT_FOUND",
+          message: "模板不存在",
+        },
+      });
+    }
+
+    return {
+      variables: extractTemplateVariables(template.body),
+    };
   });
 
   /**
@@ -901,6 +986,7 @@ function toPublicMessage(message: Message) {
     role: message.role,
     content: message.content,
     status: message.status,
+    promptTemplateId: message.promptTemplateId,
     createdAt: message.createdAt.toISOString(),
   };
 }
