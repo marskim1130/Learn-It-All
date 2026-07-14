@@ -43,6 +43,15 @@ import {
   shouldEnqueueTitleJob,
   type ConversationTitleQueue,
 } from "./jobs/title-queue.js";
+import {
+  createRequestId,
+  createStructuredLogger,
+  type StructuredLogger,
+} from "./observability/logging.js";
+import {
+  createShutdownController,
+  type ShutdownController,
+} from "./observability/shutdown.js";
 
 interface AppDependencies {
   database: {
@@ -55,6 +64,8 @@ interface AppDependencies {
   chatModel?: ChatModelProvider;
   loginRateLimiter?: LoginRateLimiter;
   titleQueue?: ConversationTitleQueue;
+  logger?: StructuredLogger;
+  shutdown?: ShutdownController;
 }
 
 /**
@@ -90,12 +101,54 @@ export function buildApp(dependencies?: AppDependencies) {
   const loginRateLimiter =
     dependencies?.loginRateLimiter ?? createMemoryLoginRateLimiter();
   const titleQueue = dependencies?.titleQueue ?? createNoopTitleQueue();
+  const logger = dependencies?.logger ?? createStructuredLogger({ service: "api" });
+  const shutdown =
+    dependencies?.shutdown ?? createShutdownController({ logger });
   /** 进程内会话表：access_token -> userId。退出时删除条目使旧令牌失效。 */
   const sessions = new Map<string, string>();
+
+  app.addHook("onRequest", async (request, reply) => {
+    const incoming = request.headers["x-request-id"];
+    const requestId =
+      typeof incoming === "string" && incoming.trim().length > 0
+        ? incoming.trim()
+        : createRequestId();
+    (request as { requestId?: string }).requestId = requestId;
+    reply.header("x-request-id", requestId);
+
+    if (shutdown.isShuttingDown) {
+      return reply.status(503).send({
+        status: "shutting_down",
+        error: {
+          code: "SERVICE_UNAVAILABLE",
+          message: "服务正在关闭，请稍后重试",
+        },
+      });
+    }
+  });
+
+  app.addHook("onResponse", async (request, reply) => {
+    const requestId = (request as { requestId?: string }).requestId;
+    logger.info("http_request", {
+      requestId,
+      method: request.method,
+      url: request.url,
+      statusCode: reply.statusCode,
+    });
+  });
 
   app.get("/health/live", async () => ({ status: "ok" }));
 
   app.get("/health/ready", async (_request, reply) => {
+    if (shutdown.isShuttingDown) {
+      return reply.status(503).send({
+        status: "not_ready",
+        dependencies: {
+          database: "draining",
+        },
+      });
+    }
+
     const databaseAvailable = await dependencies?.database.checkConnection();
 
     if (!databaseAvailable) {

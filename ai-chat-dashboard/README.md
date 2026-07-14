@@ -17,7 +17,7 @@
 - Issue 011：消息文本/Markdown 附件上传与元数据追踪已完成。
 - Issue 012：登录失败限流已完成（Redis/内存、TTL、429）。
 - Issue 013：首条消息后后台生成会话标题已完成（BullMQ/noop、幂等 Worker）。
-
+- Issue 014：运行加固已完成（关联 ID、日志脱敏、存活/就绪、优雅关闭）。
 ## 环境要求
 
 - Node.js 22 或更高版本。
@@ -127,4 +127,4 @@ pnpm build
 
 ## 下一步
 
-按照 `docs/issues/README.md` 从 Issue 014 加固运行与故障处理继续实现。
+按照 `docs/issues/README.md` 从 Issue 015 验证完整用户旅程继续实现。
