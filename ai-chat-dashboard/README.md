@@ -11,6 +11,7 @@
 - Issue 005：会话重命名与删除已完成（owner 隔离，删除 204）。
 - Issue 006：消息发送与模拟 SSE 流已完成（假提供商、状态机、级联删除）。
 - Issue 007：OpenAI 兼容提供商已接入（默认 echo，可切真实兼容 API）。
+- Issue 008：聊天性能实验台已完成（批量流式、TanStack 虚拟列表、切换 pending）。
 
 ## 环境要求
 
@@ -29,6 +30,7 @@ pnpm dev
 ```
 
 - Web：`http://localhost:3000`
+- 聊天性能实验台：`http://localhost:3000/chat`
 - API：`http://localhost:3001`
 - 存活检查：`http://localhost:3001/health/live`
 - 就绪检查：`http://localhost:3001/health/ready`
@@ -116,4 +118,4 @@ pnpm build
 
 ## 下一步
 
-按照 `docs/issues/README.md` 从 Issue 008 改善聊天交互与长会话性能继续实现。
+按照 `docs/issues/README.md` 从 Issue 009 管理基础 Prompt 模板继续实现。

@@ -145,3 +145,13 @@
 2026-07-14 10:19 +08:00 --- Issue 007 需要上游错误语义、配置选择与 server 注入 --- 补充非 2xx 失败测试与 `resolveChatModelProvider` 行为测试，实现配置解析并将提供商接入 `server.ts`，扩展 `.env.example` --- 修改 `apps/api/test/openai-provider.test.ts`、`apps/api/test/chat-config.test.ts`、`apps/api/src/chat/config.ts`、`apps/api/src/server.ts`、`.env.example`、`work.md`。撤回方式 [Rollback Strategy]：删除 config 模块与新增测试，恢复 server 与 `.env.example`，并删除本条审计记录。
 
 2026-07-14 10:20 +08:00 --- Issue 007 行为测试已通过，但缺少文档与验收勾选 --- 同步学习记录、README 模型配置说明、消息 Demo 提示与 Issue 验收 --- 修改 `docs/learning/issue-007-openai-compatible.md`、`docs/learning/README.md`、`docs/issues/007.md`、`docs/demos/messages.html`、`README.md`、`work.md`。撤回方式 [Rollback Strategy]：删除新增学习记录，恢复 README/Demo/Issue 007 与本条审计记录。
+
+2026-07-14 10:24 +08:00 --- Issue 008 缺少可执行的流式批量刷新规格 --- 进入测试驱动开发 [TDD] 红阶段 [RED]，添加流式分片在时间窗内合并且只 flush 一次的单个失败测试，未实现工具 --- 修改 `apps/web/test/batch-stream-text.test.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除该测试文件与本条审计记录。
+
+2026-07-14 10:25 +08:00 --- 批量器模块不存在导致测试无法收集，红灯符合预期 --- 进入绿阶段 [GREEN]，实现 `createStreamTextBatcher`：窗口内合并 delta，到期只 flush 一次 --- 修改 `apps/web/lib/batch-stream-text.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除批量器实现与本条审计记录。
+
+2026-07-14 10:26 +08:00 --- Issue 008 需要虚拟窗口与会话切换响应规格 --- 进入后续红阶段 [RED]，添加长列表可视索引范围与切换 pending 时草稿仍可编辑的测试；未实现模块 --- 修改 `apps/web/test/virtual-window.test.ts`、`apps/web/test/session-switch.test.ts`、`apps/web/test/batch-stream-text.test.ts`、`work.md`。撤回方式 [Rollback Strategy]：删除新增测试并删除本条审计记录。
+
+2026-07-14 10:28 +08:00 --- 虚拟窗口与会话切换模块缺失导致红灯 --- 进入绿阶段 [GREEN]，实现 `getVirtualWindow` 与 `createSessionSwitchController`，并声明 `@tanstack/react-virtual` 依赖 --- 修改 `apps/web/lib/virtual-window.ts`、`apps/web/lib/session-switch.ts`、`apps/web/package.json`、`work.md`。撤回方式 [Rollback Strategy]：删除两模块，恢复 package.json 并删除本条审计记录。
+
+2026-07-14 10:33 +08:00 --- Issue 008 工具层已通过，但缺少页面演示、虚拟列表组件与文档验收 --- 安装 TanStack Virtual，添加 `MessageList` 与 `/chat` 性能实验台，同步学习记录、基线说明与 Issue 验收；修正虚拟窗口 endIndex 期望 --- 修改 `apps/web/components/message-list.tsx`、`apps/web/components/chat-performance-lab.tsx`、`apps/web/app/chat/page.tsx`、`apps/web/test/virtual-window.test.ts`、`apps/web/package.json`、`pnpm-lock.yaml`、`apps/web/LEARNING.md`、`docs/learning/issue-008-chat-performance.md`、`docs/learning/README.md`、`docs/issues/008.md`、`README.md`、`work.md`。撤回方式 [Rollback Strategy]：删除本条所列新增文件，恢复被改文件到 Issue 007 完成后的版本，并删除本条审计记录。

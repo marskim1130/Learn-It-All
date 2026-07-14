@@ -4,3 +4,4 @@
 - `cache: "no-store"` 与 `dynamic = "force-dynamic"` 保证每次请求重新检查状态。
 - 存活检查 [Liveness Check] 表示进程可响应；就绪检查 [Readiness Check] 表示依赖可用、可承接流量。
 - `getHealth` 注入 `fetcher`，形成测试接缝 [Testing Seam]，纯函数测试无需启动服务。
+- `/chat` 是客户端性能实验台：流式批量刷新、TanStack Virtual 长列表、`useTransition` 会话切换。

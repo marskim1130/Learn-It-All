@@ -9,6 +9,7 @@
 - [Issue 005：管理已有聊天会话](issue-005-manage-conversations.md)
 - [Issue 006：发送消息与模拟流式回复](issue-006-messages-stream.md)
 - [Issue 007：OpenAI 兼容模型](issue-007-openai-compatible.md)
+- [Issue 008：聊天交互与长会话性能](issue-008-chat-performance.md)
 
 - TypeScript：泛型 [Generics]、类型推导 [Type Inference]、工具类型 [Utility Types]。
 - React：状态所有权 [State Ownership]、并发渲染 [Concurrent Rendering]、性能测量和虚拟化 [Virtualization]。
