@@ -14,6 +14,7 @@
 - [Issue 010：带变量的 Prompt 模板](issue-010-prompt-variables.md)
 - [Issue 011：消息文本附件](issue-011-message-attachments.md)
 - [Issue 012：登录限流](issue-012-login-rate-limit.md)
+- [Issue 013：后台生成会话标题](issue-013-title-jobs.md)
 
 - TypeScript：泛型 [Generics]、类型推导 [Type Inference]、工具类型 [Utility Types]。
 - React：状态所有权 [State Ownership]、并发渲染 [Concurrent Rendering]、性能测量和虚拟化 [Virtualization]。

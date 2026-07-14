@@ -38,6 +38,11 @@ import {
   extractTemplateVariables,
   renderTemplate,
 } from "./prompt-templates/variables.js";
+import {
+  createNoopTitleQueue,
+  shouldEnqueueTitleJob,
+  type ConversationTitleQueue,
+} from "./jobs/title-queue.js";
 
 interface AppDependencies {
   database: {
@@ -49,6 +54,7 @@ interface AppDependencies {
   promptTemplates?: PromptTemplateRepository;
   chatModel?: ChatModelProvider;
   loginRateLimiter?: LoginRateLimiter;
+  titleQueue?: ConversationTitleQueue;
 }
 
 /**
@@ -83,6 +89,7 @@ export function buildApp(dependencies?: AppDependencies) {
   const chatModel = dependencies?.chatModel ?? createEchoChatModelProvider();
   const loginRateLimiter =
     dependencies?.loginRateLimiter ?? createMemoryLoginRateLimiter();
+  const titleQueue = dependencies?.titleQueue ?? createNoopTitleQueue();
   /** 进程内会话表：access_token -> userId。退出时删除条目使旧令牌失效。 */
   const sessions = new Map<string, string>();
 
@@ -701,6 +708,28 @@ export function buildApp(dependencies?: AppDependencies) {
           }
         : null,
     });
+
+    // 首条消息后异步入队标题任务；失败不影响聊天主路径
+    try {
+      const historyForTitle = await messages.listByConversation(conversationId);
+      const userMessageCount = historyForTitle.filter(
+        (item) => item.role === "user",
+      ).length;
+      if (
+        shouldEnqueueTitleJob({
+          conversationTitle: conversation.title,
+          userMessageCount,
+        })
+      ) {
+        await titleQueue.enqueue({
+          conversationId,
+          ownerId: user.id,
+          seedText: content,
+        });
+      }
+    } catch {
+      // 队列不可用时静默降级
+    }
 
     const assistantMessage = await messages.create({
       conversationId,

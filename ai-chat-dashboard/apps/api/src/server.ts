@@ -5,6 +5,7 @@ import { resolveLoginRateLimiter } from "./auth/redis.js";
 import { createDatabaseUserRepository } from "./auth/users.js";
 import { resolveChatModelProvider } from "./chat/config.js";
 import { createDatabaseConversationRepository } from "./conversations/repository.js";
+import { resolveTitleQueue } from "./jobs/resolve-title-queue.js";
 import { createDatabaseMessageRepository } from "./messages/repository.js";
 import { createDatabasePromptTemplateRepository } from "./prompt-templates/repository.js";
 
@@ -15,6 +16,9 @@ const database = createDatabase(readDatabaseConfig());
 const chatModel = resolveChatModelProvider(process.env);
 const { limiter: loginRateLimiter, close: closeRateLimiter } =
   await resolveLoginRateLimiter(process.env);
+const { queue: titleQueue, close: closeTitleQueue } = await resolveTitleQueue(
+  process.env,
+);
 
 const app = buildApp({
   database: {
@@ -33,12 +37,16 @@ const app = buildApp({
   promptTemplates: createDatabasePromptTemplateRepository(database),
   chatModel,
   loginRateLimiter,
+  titleQueue,
 });
 
 app.addHook("onClose", async () => {
   await database.close();
   if (closeRateLimiter) {
     await closeRateLimiter();
+  }
+  if (closeTitleQueue) {
+    await closeTitleQueue();
   }
 });
 

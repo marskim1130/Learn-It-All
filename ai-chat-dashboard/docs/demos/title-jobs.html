@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>会话标题任务 Demo</title>
+    <style>
+      body {
+        font-family: "Segoe UI", system-ui, sans-serif;
+        max-width: 42rem;
+        margin: 0 auto;
+        padding: 1.5rem;
+        line-height: 1.6;
+      }
+      pre {
+        white-space: pre-wrap;
+        border: 1px solid #8884;
+        border-radius: 0.5rem;
+        padding: 0.75rem 1rem;
+      }
+      label {
+        display: block;
+        margin-top: 0.75rem;
+      }
+      input,
+      button {
+        font: inherit;
+        margin-top: 0.25rem;
+      }
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 0.5rem 0.75rem;
+      }
+      .actions {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        margin-top: 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>会话标题任务 Demo</h1>
+    <p>
+      创建默认标题会话并发送首条消息后，API 会入队标题任务。需单独启动 Worker：
+      <code>pnpm --filter @ai-chat-dashboard/api worker</code>
+    </p>
+    <label>API <input id="base" value="http://localhost:3001" /></label>
+    <label>邮箱 <input id="email" value="alice@example.com" /></label>
+    <label>密码 <input id="password" type="password" value="password123" /></label>
+    <label>首条消息 <input id="content" value="请帮我复习 TypeScript 泛型" /></label>
+    <div class="actions">
+      <button id="run" type="button">登录→建会话→发首条→查标题</button>
+    </div>
+    <pre id="out">等待操作…</pre>
+    <script>
+      const out = document.getElementById("out");
+      const base = () => document.getElementById("base").value.replace(/\/$/, "");
+      document.getElementById("run").onclick = async () => {
+        const logs = [];
+        const login = await fetch(`${base()}/auth/login`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            email: document.getElementById("email").value,
+            password: document.getElementById("password").value,
+          }),
+        });
+        logs.push(`login: ${login.status}`);
+        const created = await fetch(`${base()}/conversations`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({}),
+        });
+        const createdBody = await created.json();
+        logs.push(`create: ${created.status} title=${createdBody.conversation?.title}`);
+        const id = createdBody.conversation?.id;
+        const send = await fetch(`${base()}/conversations/${id}/messages`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ content: document.getElementById("content").value }),
+        });
+        logs.push(`message: ${send.status}`);
+        await new Promise((r) => setTimeout(r, 1500));
+        const detail = await fetch(`${base()}/conversations/${id}`, {
+          credentials: "include",
+        });
+        logs.push(`detail: ${detail.status}\n${await detail.text()}`);
+        out.textContent = logs.join("\n\n");
+      };
+    </script>
+  </body>
+</html>

@@ -16,6 +16,7 @@
 - Issue 010：模板变量提取/渲染与消息来源追踪已完成。
 - Issue 011：消息文本/Markdown 附件上传与元数据追踪已完成。
 - Issue 012：登录失败限流已完成（Redis/内存、TTL、429）。
+- Issue 013：首条消息后后台生成会话标题已完成（BullMQ/noop、幂等 Worker）。
 
 ## 环境要求
 
@@ -126,4 +127,4 @@ pnpm build
 
 ## 下一步
 
-按照 `docs/issues/README.md` 从 Issue 013 后台生成会话标题继续实现。
+按照 `docs/issues/README.md` 从 Issue 014 加固运行与故障处理继续实现。
