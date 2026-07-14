@@ -7,6 +7,12 @@ import { messages as messagesTable, type Database } from "@ai-chat-dashboard/dat
 export type MessageRole = "user" | "assistant";
 export type MessageStatus = "generating" | "completed" | "failed";
 
+export interface MessageAttachment {
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+}
+
 export interface Message {
   id: string;
   conversationId: string;
@@ -14,6 +20,7 @@ export interface Message {
   content: string;
   status: MessageStatus;
   promptTemplateId: string | null;
+  attachment: MessageAttachment | null;
   createdAt: Date;
 }
 
@@ -23,6 +30,7 @@ export interface CreateMessageInput {
   content: string;
   status: MessageStatus;
   promptTemplateId?: string | null;
+  attachment?: MessageAttachment | null;
 }
 
 /**
@@ -61,6 +69,7 @@ export function createMemoryMessageRepository(seed: Message[] = []): MessageRepo
         content: input.content,
         status: input.status,
         promptTemplateId: input.promptTemplateId ?? null,
+        attachment: input.attachment ?? null,
         createdAt: new Date(),
       };
       records.set(message.id, message);
@@ -93,6 +102,9 @@ function mapRow(row: {
   content: string;
   status: string;
   promptTemplateId: string | null;
+  attachmentFileName: string | null;
+  attachmentMimeType: string | null;
+  attachmentSizeBytes: number | null;
   createdAt: Date;
 }): Message {
   return {
@@ -102,6 +114,14 @@ function mapRow(row: {
     content: row.content,
     status: row.status as MessageStatus,
     promptTemplateId: row.promptTemplateId,
+    attachment:
+      row.attachmentFileName && row.attachmentMimeType && row.attachmentSizeBytes !== null
+        ? {
+            fileName: row.attachmentFileName,
+            mimeType: row.attachmentMimeType,
+            sizeBytes: row.attachmentSizeBytes,
+          }
+        : null,
     createdAt: row.createdAt,
   };
 }
@@ -120,6 +140,9 @@ export function createDatabaseMessageRepository(database: Database): MessageRepo
           content: input.content,
           status: input.status,
           promptTemplateId: input.promptTemplateId ?? null,
+          attachmentFileName: input.attachment?.fileName ?? null,
+          attachmentMimeType: input.attachment?.mimeType ?? null,
+          attachmentSizeBytes: input.attachment?.sizeBytes ?? null,
         })
         .returning({
           id: messagesTable.id,
@@ -128,6 +151,9 @@ export function createDatabaseMessageRepository(database: Database): MessageRepo
           content: messagesTable.content,
           status: messagesTable.status,
           promptTemplateId: messagesTable.promptTemplateId,
+          attachmentFileName: messagesTable.attachmentFileName,
+          attachmentMimeType: messagesTable.attachmentMimeType,
+          attachmentSizeBytes: messagesTable.attachmentSizeBytes,
           createdAt: messagesTable.createdAt,
         });
 
@@ -152,6 +178,9 @@ export function createDatabaseMessageRepository(database: Database): MessageRepo
           content: messagesTable.content,
           status: messagesTable.status,
           promptTemplateId: messagesTable.promptTemplateId,
+          attachmentFileName: messagesTable.attachmentFileName,
+          attachmentMimeType: messagesTable.attachmentMimeType,
+          attachmentSizeBytes: messagesTable.attachmentSizeBytes,
           createdAt: messagesTable.createdAt,
         });
 
@@ -166,6 +195,9 @@ export function createDatabaseMessageRepository(database: Database): MessageRepo
           content: messagesTable.content,
           status: messagesTable.status,
           promptTemplateId: messagesTable.promptTemplateId,
+          attachmentFileName: messagesTable.attachmentFileName,
+          attachmentMimeType: messagesTable.attachmentMimeType,
+          attachmentSizeBytes: messagesTable.attachmentSizeBytes,
           createdAt: messagesTable.createdAt,
         })
         .from(messagesTable)

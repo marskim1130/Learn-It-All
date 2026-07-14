@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>消息附件 Demo</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: "Segoe UI", system-ui, sans-serif;
+      }
+      body {
+        margin: 0 auto;
+        max-width: 48rem;
+        padding: 1.5rem;
+        line-height: 1.6;
+      }
+      label {
+        display: block;
+        margin-top: 0.75rem;
+      }
+      input,
+      textarea,
+      button {
+        font: inherit;
+        margin-top: 0.25rem;
+      }
+      input,
+      textarea {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 0.5rem 0.75rem;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 1rem;
+      }
+      button {
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+      }
+      pre {
+        overflow: auto;
+        padding: 0.75rem 1rem;
+        border: 1px solid color-mix(in oklab, CanvasText 20%, Canvas);
+        border-radius: 0.5rem;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>消息附件 Demo</h1>
+    <p>演示 multipart 上传单个 .txt/.md 附件（≤1MB），服务端校验后把正文并入消息上下文。</p>
+
+    <label>API <input id="base-url" value="http://localhost:3001" /></label>
+    <label>邮箱 <input id="email" value="alice@example.com" /></label>
+    <label>密码 <input id="password" type="password" value="password123" /></label>
+    <label>会话 ID <input id="conversation-id" /></label>
+    <label>说明 content <textarea id="content" rows="2">请阅读附件</textarea></label>
+    <label>附件 <input id="file" type="file" accept=".txt,.md,text/plain,text/markdown" /></label>
+    <div class="actions">
+      <button type="button" id="login-btn">登录</button>
+      <button type="button" id="create-conversation-btn">创建会话</button>
+      <button type="button" id="send-btn">发送（含附件）</button>
+      <button type="button" id="history-btn">读取历史</button>
+    </div>
+    <pre id="result">等待操作…</pre>
+
+    <script>
+      const result = document.getElementById("result");
+      const baseUrl = () => document.getElementById("base-url").value.replace(/\/$/, "");
+
+      async function call(path, options = {}) {
+        const response = await fetch(`${baseUrl()}${path}`, {
+          credentials: "include",
+          ...options,
+        });
+        const text = await response.text();
+        result.textContent = `${options.method ?? "GET"} ${path}\nstatus: ${response.status}\n\n${text}`;
+        try {
+          return { response, body: text ? JSON.parse(text) : null, text };
+        } catch {
+          return { response, body: null, text };
+        }
+      }
+
+      document.getElementById("login-btn").onclick = () =>
+        call("/auth/login", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            email: document.getElementById("email").value,
+            password: document.getElementById("password").value,
+          }),
+        });
+
+      document.getElementById("create-conversation-btn").onclick = async () => {
+        const { body } = await call("/conversations", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ title: "附件演示" }),
+        });
+        if (body?.conversation?.id) {
+          document.getElementById("conversation-id").value = body.conversation.id;
+        }
+      };
+
+      document.getElementById("send-btn").onclick = async () => {
+        const conversationId = document.getElementById("conversation-id").value;
+        if (!conversationId) {
+          result.textContent = "请先创建会话";
+          return;
+        }
+        const form = new FormData();
+        form.append("content", document.getElementById("content").value);
+        const file = document.getElementById("file").files[0];
+        if (file) form.append("file", file);
+        await call(`/conversations/${conversationId}/messages`, {
+          method: "POST",
+          body: form,
+        });
+      };
+
+      document.getElementById("history-btn").onclick = () => {
+        const conversationId = document.getElementById("conversation-id").value;
+        if (!conversationId) {
+          result.textContent = "请先创建会话";
+          return;
+        }
+        call(`/conversations/${conversationId}/messages`);
+      };
+    </script>
+  </body>
+</html>

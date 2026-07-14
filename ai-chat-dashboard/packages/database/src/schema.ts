@@ -1,4 +1,4 @@
-import { jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { integer, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 /**
  * 用户表：保存注册账户的公开标识与密码摘要。
@@ -62,6 +62,9 @@ export const messages = pgTable("messages", {
   promptTemplateId: uuid("prompt_template_id").references(() => promptTemplates.id, {
     onDelete: "set null",
   }),
+  attachmentFileName: text("attachment_file_name"),
+  attachmentMimeType: text("attachment_mime_type"),
+  attachmentSizeBytes: integer("attachment_size_bytes"),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });
 

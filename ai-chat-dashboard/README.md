@@ -14,6 +14,7 @@
 - Issue 008：聊天性能实验台已完成（批量流式、TanStack 虚拟列表、切换 pending）。
 - Issue 009：Prompt 模板 CRUD 与筛选已完成（私有隔离、tags、q 搜索）。
 - Issue 010：模板变量提取/渲染与消息来源追踪已完成。
+- Issue 011：消息文本/Markdown 附件上传与元数据追踪已完成。
 
 ## 环境要求
 
@@ -50,6 +51,7 @@ pnpm dev
 - Prompt 模板：`/prompt-templates`（POST/GET/PATCH/DELETE，支持 `?q=`）
 - 模板变量：`GET /prompt-templates/:id/variables`
 - 带模板发消息：`POST /conversations/:id/messages`（`promptTemplateId` + `variables`）
+- 带附件发消息：`POST /conversations/:id/messages`（`multipart/form-data`，字段 `file`，`.txt/.md` ≤1MB）
 
 ### 模型提供商
 
@@ -123,4 +125,4 @@ pnpm build
 
 ## 下一步
 
-按照 `docs/issues/README.md` 从 Issue 011 给消息添加文本附件继续实现。
+按照 `docs/issues/README.md` 从 Issue 012 限制登录请求频率继续实现。

@@ -15,6 +15,12 @@ import {
   type ChatModelProvider,
 } from "./chat/provider.js";
 import {
+  AttachmentValidationError,
+  mergeMessageContentWithAttachment,
+  parseTextAttachment,
+  type ParsedAttachment,
+} from "./messages/attachments.js";
+import {
   createMemoryMessageRepository,
   type Message,
   type MessageRepository,
@@ -51,7 +57,18 @@ interface AppDependencies {
  * await app.close();
  */
 export function buildApp(dependencies?: AppDependencies) {
-  const app = Fastify();
+  const app = Fastify({
+    bodyLimit: 2 * 1024 * 1024,
+  });
+  // multipart 以原始字符串解析，便于测试 inject 与教学演示
+  app.addContentTypeParser(
+    "multipart/form-data",
+    { parseAs: "string" },
+    (_request, body, done) => {
+      done(null, body);
+    },
+  );
+
   const users = dependencies?.users ?? createMemoryUserRepository();
   const conversations =
     dependencies?.conversations ?? createMemoryConversationRepository();
@@ -539,12 +556,6 @@ export function buildApp(dependencies?: AppDependencies) {
       });
     }
 
-    const body = request.body as {
-      content?: string;
-      promptTemplateId?: string;
-      variables?: Record<string, string>;
-    };
-
     const { id: conversationId } = request.params as { id: string };
     const conversation = await conversations.findByIdForOwner(
       conversationId,
@@ -559,12 +570,47 @@ export function buildApp(dependencies?: AppDependencies) {
       });
     }
 
-    let content = typeof body.content === "string" ? body.content.trim() : "";
+    let content = "";
     let promptTemplateId: string | null = null;
+    let variables: Record<string, string> = {};
+    let attachment: ParsedAttachment | null = null;
 
-    if (typeof body.promptTemplateId === "string" && body.promptTemplateId) {
+    const contentType = String(request.headers["content-type"] ?? "");
+    if (contentType.includes("multipart/form-data")) {
+      try {
+        const parsed = await parseMultipartMessageRequest(request);
+        content = parsed.content;
+        promptTemplateId = parsed.promptTemplateId;
+        variables = parsed.variables;
+        attachment = parsed.attachment;
+      } catch (error) {
+        if (error instanceof AttachmentValidationError) {
+          return reply.status(400).send({
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "请求参数无效",
+              details: [{ field: error.field, message: error.message }],
+            },
+          });
+        }
+        throw error;
+      }
+    } else {
+      const body = request.body as {
+        content?: string;
+        promptTemplateId?: string;
+        variables?: Record<string, string>;
+      };
+      content = typeof body.content === "string" ? body.content.trim() : "";
+      promptTemplateId =
+        typeof body.promptTemplateId === "string" ? body.promptTemplateId : null;
+      variables =
+        body.variables && typeof body.variables === "object" ? body.variables : {};
+    }
+
+    if (promptTemplateId) {
       const template = await promptTemplates.findByIdForOwner(
-        body.promptTemplateId,
+        promptTemplateId,
         user.id,
       );
       if (!template) {
@@ -577,10 +623,8 @@ export function buildApp(dependencies?: AppDependencies) {
       }
 
       const required = extractTemplateVariables(template.body);
-      const provided =
-        body.variables && typeof body.variables === "object" ? body.variables : {};
       const missing = required.filter((name) => {
-        const value = provided[name];
+        const value = variables[name];
         return typeof value !== "string" || value.trim().length === 0;
       });
       if (missing.length > 0) {
@@ -598,11 +642,13 @@ export function buildApp(dependencies?: AppDependencies) {
 
       const values: Record<string, string> = {};
       for (const name of required) {
-        values[name] = String(provided[name]).trim();
+        values[name] = String(variables[name]).trim();
       }
       content = renderTemplate(template.body, values);
       promptTemplateId = template.id;
     }
+
+    content = mergeMessageContentWithAttachment(content, attachment);
 
     if (!content) {
       return reply.status(400).send({
@@ -625,6 +671,13 @@ export function buildApp(dependencies?: AppDependencies) {
       content,
       status: "completed",
       promptTemplateId,
+      attachment: attachment
+        ? {
+            fileName: attachment.fileName,
+            mimeType: attachment.mimeType,
+            sizeBytes: attachment.sizeBytes,
+          }
+        : null,
     });
 
     const assistantMessage = await messages.create({
@@ -633,6 +686,7 @@ export function buildApp(dependencies?: AppDependencies) {
       content: "",
       status: "generating",
       promptTemplateId: null,
+      attachment: null,
     });
 
     const history = await messages.listByConversation(conversationId);
@@ -987,12 +1041,105 @@ function toPublicMessage(message: Message) {
     content: message.content,
     status: message.status,
     promptTemplateId: message.promptTemplateId,
+    attachment: message.attachment,
     createdAt: message.createdAt.toISOString(),
   };
 }
 
 function formatSseEvent(event: string, data: unknown): string {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+}
+
+async function parseMultipartMessageRequest(request: {
+  headers: Record<string, unknown>;
+  body?: unknown;
+}): Promise<{
+  content: string;
+  promptTemplateId: string | null;
+  variables: Record<string, string>;
+  attachment: ParsedAttachment | null;
+}> {
+  const contentType = String(request.headers["content-type"] ?? "");
+  const boundaryMatch = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(contentType);
+  const boundary = boundaryMatch?.[1] ?? boundaryMatch?.[2];
+  if (!boundary) {
+    throw new AttachmentValidationError("file", "multipart boundary 无效");
+  }
+
+  const rawBody =
+    typeof request.body === "string"
+      ? request.body
+      : Buffer.isBuffer(request.body)
+        ? request.body.toString("utf8")
+        : "";
+  if (!rawBody) {
+    throw new AttachmentValidationError("file", "multipart 请求体为空");
+  }
+
+  let content = "";
+  let promptTemplateId: string | null = null;
+  let variables: Record<string, string> = {};
+  let attachment: ParsedAttachment | null = null;
+  let fileCount = 0;
+
+  const parts = rawBody.split(`--${boundary}`);
+  for (const rawPart of parts) {
+    const part = rawPart.replace(/^\r?\n/, "").replace(/\r?\n--\r?\n?$/, "").replace(/--\r?\n?$/, "");
+    if (!part || part === "--" || part === "--\r\n") {
+      continue;
+    }
+
+    const separatorIndex = part.search(/\r?\n\r?\n/);
+    if (separatorIndex < 0) {
+      continue;
+    }
+
+    const headerText = part.slice(0, separatorIndex);
+    let bodyText = part.slice(separatorIndex).replace(/^\r?\n\r?\n/, "");
+    bodyText = bodyText.replace(/\r?\n$/, "");
+
+    const disposition = /content-disposition:\s*form-data;\s*name="([^"]+)"(?:;\s*filename="([^"]*)")?/i.exec(
+      headerText,
+    );
+    if (!disposition) {
+      continue;
+    }
+
+    const fieldName = disposition[1] ?? "";
+    const fileName = disposition[2];
+    if (fileName !== undefined) {
+      fileCount += 1;
+      if (fileCount > 1) {
+        throw new AttachmentValidationError("file", "每条消息最多一个附件");
+      }
+      const mimeMatch = /content-type:\s*([^\r\n]+)/i.exec(headerText);
+      const mimeType = mimeMatch?.[1]?.trim();
+      attachment = parseTextAttachment({
+        fileName: fileName || "attachment.txt",
+        ...(mimeType ? { mimeType } : {}),
+        content: bodyText,
+      });
+      continue;
+    }
+
+    const value = bodyText.trim();
+    if (fieldName === "content") {
+      content = value;
+    } else if (fieldName === "promptTemplateId") {
+      promptTemplateId = value || null;
+    } else if (fieldName === "variables") {
+      try {
+        const parsed = JSON.parse(value || "{}") as Record<string, string>;
+        if (parsed && typeof parsed === "object") {
+          variables = parsed;
+        }
+      } catch {
+        throw new AttachmentValidationError("variables", "variables 必须是 JSON 对象");
+      }
+    }
+  }
+
+  return { content, promptTemplateId, variables, attachment };
 }
 
 async function resolveCurrentUser(

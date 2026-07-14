@@ -144,6 +144,7 @@ describe("POST /conversations/:id/messages", () => {
       content: "你好",
       status: "completed",
       promptTemplateId: null,
+      attachment: null,
       createdAt: expect.any(String),
     });
 
@@ -153,6 +154,7 @@ describe("POST /conversations/:id/messages", () => {
       content: "",
       status: "generating",
       promptTemplateId: null,
+      attachment: null,
       createdAt: expect.any(String),
     });
 
@@ -171,6 +173,7 @@ describe("POST /conversations/:id/messages", () => {
       content: "你好",
       status: "completed",
       promptTemplateId: null,
+      attachment: null,
       createdAt: expect.any(String),
     });
 
@@ -206,6 +209,7 @@ describe("POST /conversations/:id/messages", () => {
           content: "你好",
           status: "completed",
           promptTemplateId: null,
+          attachment: null,
           createdAt: expect.any(String),
         },
         {
@@ -214,6 +218,7 @@ describe("POST /conversations/:id/messages", () => {
           content: "你好",
           status: "completed",
           promptTemplateId: null,
+          attachment: null,
           createdAt: expect.any(String),
         },
       ],
@@ -312,6 +317,7 @@ describe("POST /conversations/:id/messages", () => {
       content: "半",
       status: "failed",
       promptTemplateId: null,
+      attachment: null,
       createdAt: expect.any(String),
       message: expect.any(String),
     });
@@ -329,6 +335,7 @@ describe("POST /conversations/:id/messages", () => {
         content: "你好",
         status: "completed",
         promptTemplateId: null,
+        attachment: null,
         createdAt: expect.any(String),
       },
       {
@@ -337,6 +344,7 @@ describe("POST /conversations/:id/messages", () => {
         content: "半",
         status: "failed",
         promptTemplateId: null,
+        attachment: null,
         createdAt: expect.any(String),
       },
     ]);
